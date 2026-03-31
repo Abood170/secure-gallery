@@ -1,0 +1,40 @@
+name: gallery_app
+description: Encrypted Mobile Gallery App with Safe Share
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP Client
+  dio: ^5.4.3
+
+  # Secure Storage (JWT + RSA private key)
+  flutter_secure_storage: ^9.2.2
+
+  # Image Picker
+  image_picker: ^1.1.2
+
+  # State Management
+  provider: ^6.1.2
+
+  # Cryptography — AES-GCM and ChaCha20-Poly1305
+  cryptography: ^2.7.0
+
+  # RSA-OAEP key wrapping
+  fast_rsa: ^3.6.4
+
+  # Icons
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

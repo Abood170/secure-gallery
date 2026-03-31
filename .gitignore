@@ -1,0 +1,23 @@
+# ── Node.js backend ───────────────────────────────────────────────────────────
+app/node_modules/
+app/.env
+app/uploads/
+
+# ── Flutter frontend ──────────────────────────────────────────────────────────
+gallery_app/.dart_tool/
+gallery_app/.flutter-plugins-dependencies
+gallery_app/.pub-cache/
+gallery_app/.pub/
+gallery_app/build/
+gallery_app/coverage/
+
+# ── OS / Editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+
+# ── Sensitive / generated ─────────────────────────────────────────────────────
+*.log
+*.env

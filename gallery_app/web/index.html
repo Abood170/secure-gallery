@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="gallery_app">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>gallery_app</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
+
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+  <script src="flutter_bootstrap.js" async></script>
+
+  <!-- RSA via browser SubtleCrypto (key gen, encrypt, decrypt) -->
+  <script>
+    async function nativeGenerateRsaKeyPair() {
+      const keyPair = await window.crypto.subtle.generateKey(
+        { name: 'RSA-OAEP', modulusLength: 2048,
+          publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+        true, ['encrypt', 'decrypt']
+      );
+      const [spki, pkcs8] = await Promise.all([
+        window.crypto.subtle.exportKey('spki',  keyPair.publicKey),
+        window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey)
+      ]);
+      const toB64 = buf => btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+      const toPem = (b64, type) =>
+        `-----BEGIN ${type}-----\n${b64.match(/.{1,64}/g).join('\n')}\n-----END ${type}-----\n`;
+      return {
+        publicKey:  toPem(toB64(spki),  'PUBLIC KEY'),
+        privateKey: toPem(toB64(pkcs8), 'PRIVATE KEY')
+      };
+    }
+
+    async function nativeRsaEncrypt(publicKeyPem, dataB64) {
+      const pemBody = publicKeyPem
+        .replace(/-----BEGIN PUBLIC KEY-----/, '')
+        .replace(/-----END PUBLIC KEY-----/, '')
+        .replace(/\s+/g, '');
+      const keyBuf = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0));
+      const cryptoKey = await window.crypto.subtle.importKey(
+        'spki', keyBuf, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']
+      );
+      const dataBuf  = Uint8Array.from(atob(dataB64), c => c.charCodeAt(0));
+      const encrypted = await window.crypto.subtle.encrypt(
+        { name: 'RSA-OAEP' }, cryptoKey, dataBuf
+      );
+      return btoa(String.fromCharCode.apply(null, new Uint8Array(encrypted)));
+    }
+
+    async function nativeRsaDecrypt(privateKeyPem, dataB64) {
+      const pemBody = privateKeyPem
+        .replace(/-----BEGIN PRIVATE KEY-----/, '')
+        .replace(/-----END PRIVATE KEY-----/, '')
+        .replace(/\s+/g, '');
+      const keyBuf = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0));
+      const cryptoKey = await window.crypto.subtle.importKey(
+        'pkcs8', keyBuf, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['decrypt']
+      );
+      const dataBuf   = Uint8Array.from(atob(dataB64), c => c.charCodeAt(0));
+      const decrypted = await window.crypto.subtle.decrypt(
+        { name: 'RSA-OAEP' }, cryptoKey, dataBuf
+      );
+      return btoa(String.fromCharCode.apply(null, new Uint8Array(decrypted)));
+    }
+  </script>
+</body>
+</html>
