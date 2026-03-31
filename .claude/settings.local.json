@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(flutter --version)",
-      "Bash(cmd /c \"dir \"\"C:\\\\Program Files\\\\PostgreSQL\"\" /b 2>&1\")"
-    ]
-  }
-}
