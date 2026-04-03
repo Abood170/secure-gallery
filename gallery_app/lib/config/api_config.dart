@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 class ApiConfig {
   // Web → localhost, Android emulator → 10.0.2.2, physical device → your PC's LAN IP
   static String get baseUrl =>
-      kIsWeb ? 'http://localhost:4000' : 'http://10.0.2.2:4000';
+      kIsWeb ? 'http://192.168.100.5:4000' : 'http://192.168.100.5:4000';
 
   static const String register        = '/api/auth/register';
   static const String login           = '/api/auth/login';

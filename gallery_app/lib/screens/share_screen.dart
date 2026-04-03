@@ -31,7 +31,8 @@ class _ShareScreenState extends State<ShareScreen>
   final _emailCtrl = TextEditingController();
   final _formKey   = GlobalKey<FormState>();
   // step: 0=idle 1=lookup 2=encrypting 3=sending 4=done
-  int _step = 0;
+  int _step         = 0;
+  int _currentShare = 0;
 
   // ── Animations ─────────────────────────────────────────────────────────────
   late final AnimationController _floatCtrl;
@@ -82,10 +83,10 @@ class _ShareScreenState extends State<ShareScreen>
   }
 
   // ── Share logic ────────────────────────────────────────────────────────────
-  Future<void> _share(MediaItem item) async {
+  Future<void> _share(List<MediaItem> items) async {
     if (!_formKey.currentState!.validate() || _step > 0) return;
 
-    setState(() => _step = 1); // looking up recipient
+    setState(() { _step = 1; _currentShare = 0; });
 
     try {
       final userData =
@@ -99,27 +100,30 @@ class _ShareScreenState extends State<ShareScreen>
             'They must register from the app first.');
       }
 
-      final keyBase64 = await StorageService.getSymmetricKey(item.mediaId);
-      if (keyBase64 == null) {
-        throw Exception(
-            'Symmetric key not found on this device.\n'
-            'You can only share images uploaded from this device.');
+      for (int i = 0; i < items.length; i++) {
+        final item = items[i];
+        setState(() { _step = 2; _currentShare = i + 1; });
+
+        final keyBase64 = await StorageService.getSymmetricKey(item.mediaId);
+        if (keyBase64 == null) {
+          throw Exception(
+              'Key for "${item.filename}" not found on this device.\n'
+              'You can only share images uploaded from this device.');
+        }
+
+        final encryptedKey =
+            await CryptoService.rsaEncryptKey(keyBase64, receiverPublicKey);
+
+        setState(() => _step = 3);
+
+        await ShareService.createShare(
+          mediaId:      item.mediaId,
+          receiverId:   receiverId,
+          encryptedKey: encryptedKey,
+        );
       }
 
-      setState(() => _step = 2); // encrypting key with RSA
-
-      final encryptedKey =
-          await CryptoService.rsaEncryptKey(keyBase64, receiverPublicKey);
-
-      setState(() => _step = 3); // sending to server
-
-      await ShareService.createShare(
-        mediaId:      item.mediaId,
-        receiverId:   receiverId,
-        encryptedKey: encryptedKey,
-      );
-
-      setState(() => _step = 4); // done
+      setState(() => _step = 4);
       _checkCtrl.forward();
 
       await Future.delayed(const Duration(milliseconds: 1600));
@@ -143,8 +147,8 @@ class _ShareScreenState extends State<ShareScreen>
   // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final item =
-        ModalRoute.of(context)!.settings.arguments as MediaItem;
+    final items =
+        ModalRoute.of(context)!.settings.arguments as List<MediaItem>;
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -169,13 +173,14 @@ class _ShareScreenState extends State<ShareScreen>
                             child: child,
                           ),
                           child: _MainCard(
-                            item:      item,
-                            step:      _step,
-                            formKey:   _formKey,
-                            emailCtrl: _emailCtrl,
-                            pulseAnim: _pulseAnim,
-                            checkAnim: _checkAnim,
-                            onShare:   () => _share(item),
+                            items:        items,
+                            currentShare: _currentShare,
+                            step:         _step,
+                            formKey:      _formKey,
+                            emailCtrl:    _emailCtrl,
+                            pulseAnim:    _pulseAnim,
+                            checkAnim:    _checkAnim,
+                            onShare:      () => _share(items),
                           ),
                         ),
                       ),
@@ -196,7 +201,8 @@ class _ShareScreenState extends State<ShareScreen>
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _MainCard extends StatelessWidget {
-  final MediaItem             item;
+  final List<MediaItem>       items;
+  final int                   currentShare;
   final int                   step;
   final GlobalKey<FormState>  formKey;
   final TextEditingController emailCtrl;
@@ -205,7 +211,8 @@ class _MainCard extends StatelessWidget {
   final VoidCallback          onShare;
 
   const _MainCard({
-    required this.item,
+    required this.items,
+    required this.currentShare,
     required this.step,
     required this.formKey,
     required this.emailCtrl,
@@ -251,18 +258,20 @@ class _MainCard extends StatelessWidget {
             child: step == 0
                 ? _IdleContent(
                     key:       const ValueKey('idle'),
-                    item:      item,
+                    items:     items,
                     formKey:   formKey,
                     emailCtrl: emailCtrl,
                     pulseAnim: pulseAnim,
                     onShare:   onShare,
                   )
                 : _ShareProgress(
-                    key:       const ValueKey('progress'),
-                    step:      step,
-                    pulseAnim: pulseAnim,
-                    checkAnim: checkAnim,
-                    email:     emailCtrl.text.trim(),
+                    key:          const ValueKey('progress'),
+                    step:         step,
+                    currentShare: currentShare,
+                    totalShares:  items.length,
+                    pulseAnim:    pulseAnim,
+                    checkAnim:    checkAnim,
+                    email:        emailCtrl.text.trim(),
                   ),
           ),
         ),
@@ -276,7 +285,7 @@ class _MainCard extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _IdleContent extends StatelessWidget {
-  final MediaItem             item;
+  final List<MediaItem>       items;
   final GlobalKey<FormState>  formKey;
   final TextEditingController emailCtrl;
   final Animation<double>     pulseAnim;
@@ -284,7 +293,7 @@ class _IdleContent extends StatelessWidget {
 
   const _IdleContent({
     super.key,
-    required this.item,
+    required this.items,
     required this.formKey,
     required this.emailCtrl,
     required this.pulseAnim,
@@ -331,7 +340,7 @@ class _IdleContent extends StatelessWidget {
           const SizedBox(height: 22),
 
           // ── File info ──────────────────────────────────────────────────────
-          _FileInfoCard(item: item),
+          _FileInfoCard(items: items),
           const SizedBox(height: 22),
 
           _GlowDivider(),
@@ -359,7 +368,7 @@ class _IdleContent extends StatelessWidget {
           const SizedBox(height: 28),
 
           // ── Send button ────────────────────────────────────────────────────
-          _SendButton(pulseAnim: pulseAnim, onTap: onShare),
+          _SendButton(fileCount: items.length, pulseAnim: pulseAnim, onTap: onShare),
         ],
       ),
     );
@@ -371,8 +380,19 @@ class _IdleContent extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _FileInfoCard extends StatelessWidget {
+  final List<MediaItem> items;
+  const _FileInfoCard({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.length == 1) return _SingleFileCard(item: items.first);
+    return _MultiFileCard(items: items);
+  }
+}
+
+class _SingleFileCard extends StatelessWidget {
   final MediaItem item;
-  const _FileInfoCard({required this.item});
+  const _SingleFileCard({required this.item});
 
   Color get _algoColor =>
       item.algo == 'AES-GCM' ? _kGreen : _kAmber;
@@ -390,46 +410,35 @@ class _FileInfoCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Lock icon
           Container(
-            width: 40,
-            height: 40,
+            width: 40, height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: _kPurple.withValues(alpha: 0.12),
               border: Border.all(
                   color: _kPurple.withValues(alpha: 0.3), width: 1),
             ),
-            child:
-                const Icon(Icons.lock_rounded, color: _kPurpleL, size: 18),
+            child: const Icon(Icons.lock_rounded, color: _kPurpleL, size: 18),
           ),
           const SizedBox(width: 14),
-
-          // Filename + algo
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  item.filename,
-                  style: const TextStyle(
-                    color: _kWhite,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(item.filename,
+                    style: const TextStyle(
+                        color: _kWhite,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Text(
-                      'Encrypted · ',
-                      style: TextStyle(
-                        color: _kWhite.withValues(alpha: 0.3),
-                        fontSize: 11,
-                      ),
-                    ),
+                    Text('Encrypted · ',
+                        style: TextStyle(
+                            color: _kWhite.withValues(alpha: 0.3),
+                            fontSize: 11)),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 7, vertical: 2),
@@ -455,6 +464,96 @@ class _FileInfoCard extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Multi-file summary card ───────────────────────────────────────────────────
+
+class _MultiFileCard extends StatelessWidget {
+  final List<MediaItem> items;
+  const _MultiFileCard({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: _kPurple.withValues(alpha: 0.07),
+        border: Border.all(color: _kPurple.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _kPurple.withValues(alpha: 0.12),
+                  border: Border.all(
+                      color: _kPurple.withValues(alpha: 0.3), width: 1),
+                ),
+                child: const Icon(Icons.photo_library_outlined,
+                    color: _kPurpleL, size: 16),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${items.length} Images Selected',
+                    style: const TextStyle(
+                        color: _kWhite,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  Text('All end-to-end encrypted',
+                      style: TextStyle(
+                          color: _kWhite.withValues(alpha: 0.35),
+                          fontSize: 10)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Filename list (up to 4, then +N more)
+          ...List.generate(items.length > 4 ? 4 : items.length, (i) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.lock_rounded,
+                      color: _kPurpleL.withValues(alpha: 0.4), size: 11),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      items[i].filename,
+                      style: TextStyle(
+                          color: _kWhite.withValues(alpha: 0.5),
+                          fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (items.length > 4)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                '  + ${items.length - 4} more…',
+                style: TextStyle(
+                    color: _kPurpleL.withValues(alpha: 0.5), fontSize: 11),
+              ),
+            ),
         ],
       ),
     );
@@ -658,9 +757,14 @@ class _HowStep extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _SendButton extends StatefulWidget {
+  final int               fileCount;
   final Animation<double> pulseAnim;
   final VoidCallback      onTap;
-  const _SendButton({required this.pulseAnim, required this.onTap});
+  const _SendButton({
+    required this.fileCount,
+    required this.pulseAnim,
+    required this.onTap,
+  });
 
   @override
   State<_SendButton> createState() => _SendButtonState();
@@ -732,14 +836,16 @@ class _SendButtonState extends State<_SendButton>
               child: child,
             ),
           ),
-          child: const Row(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.send_rounded, color: _kWhite, size: 18),
-              SizedBox(width: 10),
+              const Icon(Icons.send_rounded, color: _kWhite, size: 18),
+              const SizedBox(width: 10),
               Text(
-                'Send Securely',
-                style: TextStyle(
+                widget.fileCount > 1
+                    ? 'Send ${widget.fileCount} Images Securely'
+                    : 'Send Securely',
+                style: const TextStyle(
                   color: _kWhite,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -760,6 +866,8 @@ class _SendButtonState extends State<_SendButton>
 
 class _ShareProgress extends StatelessWidget {
   final int               step;
+  final int               currentShare;
+  final int               totalShares;
   final Animation<double> pulseAnim;
   final Animation<double> checkAnim;
   final String            email;
@@ -767,6 +875,8 @@ class _ShareProgress extends StatelessWidget {
   const _ShareProgress({
     super.key,
     required this.step,
+    required this.currentShare,
+    required this.totalShares,
     required this.pulseAnim,
     required this.checkAnim,
     required this.email,
@@ -801,7 +911,12 @@ class _ShareProgress extends StatelessWidget {
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: _StepLabel(
-              key: ValueKey(step), step: step, email: email),
+            key:     ValueKey('${step}_$currentShare'),
+            step:    step,
+            email:   email,
+            current: currentShare,
+            total:   totalShares,
+          ),
         ),
 
         const SizedBox(height: 28),
@@ -905,14 +1020,40 @@ class _DoneOrb extends StatelessWidget {
 class _StepLabel extends StatelessWidget {
   final int    step;
   final String email;
-  const _StepLabel({super.key, required this.step, required this.email});
+  final int    current;
+  final int    total;
+  const _StepLabel({
+    super.key,
+    required this.step,
+    required this.email,
+    required this.current,
+    required this.total,
+  });
 
-  (String, String) get _texts => switch (step) {
-    1 => ('LOOKING UP RECIPIENT', 'Fetching public key for $email…'),
-    2 => ('ENCRYPTING KEY', 'RSA-OAEP encrypting symmetric key…'),
-    3 => ('SENDING', 'Transmitting encrypted share to server…'),
-    _ => ('SHARE SENT!', 'Delivered securely to $email'),
-  };
+  (String, String) get _texts {
+    final multi = total > 1;
+    return switch (step) {
+      1 => ('LOOKING UP RECIPIENT', 'Fetching public key for $email…'),
+      2 => (
+            'ENCRYPTING KEY',
+            multi
+                ? 'RSA-OAEP encrypting key for image $current of $total…'
+                : 'RSA-OAEP encrypting symmetric key…',
+          ),
+      3 => (
+            'SENDING',
+            multi
+                ? 'Transmitting image $current of $total to server…'
+                : 'Transmitting encrypted share to server…',
+          ),
+      _ => (
+            'SHARE SENT!',
+            multi
+                ? 'Delivered $total images securely to $email'
+                : 'Delivered securely to $email',
+          ),
+    };
+  }
 
   @override
   Widget build(BuildContext context) {

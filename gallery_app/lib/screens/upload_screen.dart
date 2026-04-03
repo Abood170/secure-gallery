@@ -33,10 +33,11 @@ class UploadScreen extends StatefulWidget {
 class _UploadScreenState extends State<UploadScreen>
     with TickerProviderStateMixin {
   // ── Data ───────────────────────────────────────────────────────────────────
-  XFile?     _selectedFile;
-  Uint8List? _previewBytes;
-  String     _selectedAlgo = 'AES-GCM';
-  int        _step         = 0; // 0=idle 1=encrypting 2=uploading 3=done
+  List<XFile>    _selectedFiles = [];
+  List<Uint8List> _thumbnails   = [];
+  String      _selectedAlgo  = 'AES-GCM';
+  int         _step          = 0; // 0=idle 1=encrypting 2=uploading 3=done
+  int         _currentUpload = 0;
 
   // ── Animations ─────────────────────────────────────────────────────────────
   late final AnimationController _floatCtrl;
@@ -84,57 +85,66 @@ class _UploadScreenState extends State<UploadScreen>
     super.dispose();
   }
 
-  // ── Pick image ─────────────────────────────────────────────────────────────
+  // ── Pick images (multi-select) ─────────────────────────────────────────────
   Future<void> _pickImage() async {
     if (_step > 0) return;
-    final xFile =
-        await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (xFile != null) {
-      final bytes = await xFile.readAsBytes();
-      _fadeCtrl.reset();
+    final files = await ImagePicker().pickMultiImage();
+    if (files.isNotEmpty) {
+      final thumbs = await Future.wait(files.map((f) => f.readAsBytes()));
       setState(() {
-        _selectedFile = xFile;
-        _previewBytes = bytes;
+        _selectedFiles = files;
+        _thumbnails    = thumbs;
       });
-      _fadeCtrl.forward();
     }
   }
 
-  // ── Upload ─────────────────────────────────────────────────────────────────
+  // ── Remove one file from selection ────────────────────────────────────────
+  void _removeFile(int index) {
+    setState(() {
+      _selectedFiles.removeAt(index);
+      _thumbnails.removeAt(index);
+    });
+  }
+
+  // ── Upload all selected files ──────────────────────────────────────────────
   Future<void> _upload() async {
-    if (_selectedFile == null || _previewBytes == null || _step > 0) return;
+    if (_selectedFiles.isEmpty || _step > 0) return;
 
-    setState(() => _step = 1);
     try {
-      final bytes    = _previewBytes!;
-      final filename = _selectedFile!.name;
+      for (int i = 0; i < _selectedFiles.length; i++) {
+        final file = _selectedFiles[i];
+        setState(() { _step = 1; _currentUpload = i + 1; });
 
-      final result = await CryptoService.encrypt(
-          Uint8List.fromList(bytes), _selectedAlgo);
+        final bytes    = await file.readAsBytes();
+        final filename = file.name;
 
-      setState(() => _step = 2);
-      final mediaId = await MediaService.uploadMedia(
-        ciphertext: result.ciphertext,
-        filename:   filename,
-        algo:       _selectedAlgo,
-        iv:         result.iv,
-      );
+        final result = await CryptoService.encrypt(
+            Uint8List.fromList(bytes), _selectedAlgo);
 
-      await StorageService.saveSymmetricKey(mediaId, result.keyBase64);
+        setState(() => _step = 2);
+        final mediaId = await MediaService.uploadMedia(
+          ciphertext: result.ciphertext,
+          filename:   filename,
+          algo:       _selectedAlgo,
+          iv:         result.iv,
+        );
+
+        await StorageService.saveSymmetricKey(mediaId, result.keyBase64);
+
+        if (mounted) {
+          context.read<GalleryProvider>().prependMedia(MediaItem(
+            mediaId:  mediaId,
+            filename: filename,
+            algo:     _selectedAlgo,
+            iv:       result.iv,
+          ));
+        }
+      }
 
       setState(() => _step = 3);
       _checkCtrl.forward();
-
-      if (mounted) {
-        context.read<GalleryProvider>().prependMedia(MediaItem(
-          mediaId:  mediaId,
-          filename: filename,
-          algo:     _selectedAlgo,
-          iv:       result.iv,
-        ));
-        await Future.delayed(const Duration(milliseconds: 1500));
-        if (mounted) Navigator.pop(context);
-      }
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
         setState(() => _step = 0);
@@ -173,17 +183,18 @@ class _UploadScreenState extends State<UploadScreen>
                           child: child,
                         ),
                         child: _GlassCard(
-                          step:         _step,
-                          selectedFile: _selectedFile,
-                          previewBytes: _previewBytes,
-                          selectedAlgo: _selectedAlgo,
-                          fadeAnim:     _fadeAnim,
-                          pulseAnim:    _pulseAnim,
-                          checkAnim:    _checkAnim,
-                          onPickImage:  _pickImage,
-                          onSelectAlgo: (v) =>
+                          step:          _step,
+                          files:         _selectedFiles,
+                          thumbnails:    _thumbnails,
+                          currentUpload: _currentUpload,
+                          selectedAlgo:  _selectedAlgo,
+                          pulseAnim:     _pulseAnim,
+                          checkAnim:     _checkAnim,
+                          onPickImage:   _pickImage,
+                          onRemoveFile:  _removeFile,
+                          onSelectAlgo:  (v) =>
                               setState(() => _selectedAlgo = v),
-                          onUpload:     _upload,
+                          onUpload:      _upload,
                         ),
                       ),
                     ),
@@ -203,26 +214,28 @@ class _UploadScreenState extends State<UploadScreen>
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _GlassCard extends StatelessWidget {
-  final int              step;
-  final XFile?           selectedFile;
-  final Uint8List?       previewBytes;
-  final String           selectedAlgo;
-  final Animation<double> fadeAnim;
-  final Animation<double> pulseAnim;
-  final Animation<double> checkAnim;
-  final VoidCallback      onPickImage;
+  final int                  step;
+  final List<XFile>          files;
+  final List<Uint8List>      thumbnails;
+  final int                  currentUpload;
+  final String               selectedAlgo;
+  final Animation<double>    pulseAnim;
+  final Animation<double>    checkAnim;
+  final VoidCallback         onPickImage;
+  final void Function(int)   onRemoveFile;
   final ValueChanged<String> onSelectAlgo;
-  final VoidCallback      onUpload;
+  final VoidCallback         onUpload;
 
   const _GlassCard({
     required this.step,
-    required this.selectedFile,
-    required this.previewBytes,
+    required this.files,
+    required this.thumbnails,
+    required this.currentUpload,
     required this.selectedAlgo,
-    required this.fadeAnim,
     required this.pulseAnim,
     required this.checkAnim,
     required this.onPickImage,
+    required this.onRemoveFile,
     required this.onSelectAlgo,
     required this.onUpload,
   });
@@ -259,11 +272,12 @@ class _GlassCard extends StatelessWidget {
 
               // Upload zone
               _UploadZone(
-                previewBytes: previewBytes,
-                fadeAnim:     fadeAnim,
+                files:        files,
+                thumbnails:   thumbnails,
                 pulseAnim:    pulseAnim,
                 enabled:      step == 0,
                 onTap:        onPickImage,
+                onRemoveFile: onRemoveFile,
               ),
               const SizedBox(height: 24),
 
@@ -282,18 +296,21 @@ class _GlassCard extends StatelessWidget {
                 ),
                 child: step == 0
                     ? _IdleSection(
-                        key: const ValueKey('idle'),
-                        selectedAlgo: selectedAlgo,
-                        hasFile:      selectedFile != null,
-                        pulseAnim:    pulseAnim,
-                        onSelectAlgo: onSelectAlgo,
-                        onUpload:     onUpload,
+                        key:           const ValueKey('idle'),
+                        selectedAlgo:  selectedAlgo,
+                        hasFile:       files.isNotEmpty,
+                        fileCount:     files.length,
+                        pulseAnim:     pulseAnim,
+                        onSelectAlgo:  onSelectAlgo,
+                        onUpload:      onUpload,
                       )
                     : _ProgressSteps(
-                        key: const ValueKey('progress'),
-                        step:      step,
-                        pulseAnim: pulseAnim,
-                        checkAnim: checkAnim,
+                        key:           const ValueKey('progress'),
+                        step:          step,
+                        currentUpload: currentUpload,
+                        totalUploads:  files.length,
+                        pulseAnim:     pulseAnim,
+                        checkAnim:     checkAnim,
                       ),
               ),
             ],
@@ -309,6 +326,7 @@ class _GlassCard extends StatelessWidget {
 class _IdleSection extends StatelessWidget {
   final String  selectedAlgo;
   final bool    hasFile;
+  final int     fileCount;
   final Animation<double> pulseAnim;
   final ValueChanged<String> onSelectAlgo;
   final VoidCallback onUpload;
@@ -317,6 +335,7 @@ class _IdleSection extends StatelessWidget {
     super.key,
     required this.selectedAlgo,
     required this.hasFile,
+    required this.fileCount,
     required this.pulseAnim,
     required this.onSelectAlgo,
     required this.onUpload,
@@ -327,6 +346,28 @@ class _IdleSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (fileCount > 1)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: _kPurple.withValues(alpha: 0.1),
+                border: Border.all(color: _kPurple.withValues(alpha: 0.35)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.photo_library_rounded, color: _kPurpleL, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$fileCount photos selected',
+                    style: const TextStyle(color: _kPurpleL, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ),
         _AlgoSelector(
           selected:  selectedAlgo,
           onSelect:  onSelectAlgo,
@@ -334,6 +375,7 @@ class _IdleSection extends StatelessWidget {
         const SizedBox(height: 28),
         _UploadButton(
           enabled:   hasFile,
+          fileCount: fileCount,
           pulseAnim: pulseAnim,
           onTap:     onUpload,
         ),
@@ -559,18 +601,20 @@ class _SecurityBadge extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _UploadZone extends StatefulWidget {
-  final Uint8List?        previewBytes;
-  final Animation<double> fadeAnim;
-  final Animation<double> pulseAnim;
-  final bool              enabled;
-  final VoidCallback      onTap;
+  final List<XFile>        files;
+  final List<Uint8List>    thumbnails;
+  final Animation<double>  pulseAnim;
+  final bool               enabled;
+  final VoidCallback        onTap;
+  final void Function(int) onRemoveFile;
 
   const _UploadZone({
-    required this.previewBytes,
-    required this.fadeAnim,
+    required this.files,
+    required this.thumbnails,
     required this.pulseAnim,
     required this.enabled,
     required this.onTap,
+    required this.onRemoveFile,
   });
 
   @override
@@ -582,6 +626,12 @@ class _UploadZoneState extends State<_UploadZone> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.thumbnails.isNotEmpty) return _buildPreviewGrid();
+    return _buildDropZone();
+  }
+
+  // ── Drop zone (no files selected yet) ────────────────────────────────────
+  Widget _buildDropZone() {
     return MouseRegion(
       cursor: widget.enabled
           ? SystemMouseCursors.click
@@ -600,8 +650,7 @@ class _UploadZoneState extends State<_UploadZone> {
               height: 200,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                color: _kPurple.withValues(
-                    alpha: _hovered ? 0.1 : 0.04),
+                color: _kPurple.withValues(alpha: _hovered ? 0.1 : 0.04),
               ),
               child: Stack(
                 children: [
@@ -612,28 +661,167 @@ class _UploadZoneState extends State<_UploadZone> {
                       ),
                     ),
                   ),
-                  widget.previewBytes != null
-                      ? FadeTransition(
-                          opacity: widget.fadeAnim,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: Image.memory(
-                              widget.previewBytes!,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                            ),
-                          ),
-                        )
-                      : _DropPrompt(
-                          hovered:   _hovered,
-                          pulseAnim: widget.pulseAnim,
-                        ),
+                  _DropPrompt(hovered: _hovered, pulseAnim: widget.pulseAnim),
                 ],
               ),
             );
           },
         ),
+      ),
+    );
+  }
+
+  // ── Preview grid (files selected) ────────────────────────────────────────
+  Widget _buildPreviewGrid() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: _kPurple.withValues(alpha: 0.04),
+        border: Border.all(color: _kPurple.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header row
+          Row(
+            children: [
+              const Icon(Icons.photo_library_rounded,
+                  color: _kPurpleL, size: 14),
+              const SizedBox(width: 6),
+              Text(
+                '${widget.files.length} image${widget.files.length == 1 ? '' : 's'} selected',
+                style: const TextStyle(
+                    color: _kPurpleL,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              if (widget.enabled)
+                GestureDetector(
+                  onTap: widget.onTap,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: _kPurple.withValues(alpha: 0.15),
+                      border: Border.all(
+                          color: _kPurple.withValues(alpha: 0.4)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_rounded,
+                            color: _kPurpleL, size: 13),
+                        SizedBox(width: 4),
+                        Text('Add more',
+                            style: TextStyle(
+                                color: _kPurpleL,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Thumbnail grid
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(
+              widget.thumbnails.length,
+              (i) => _ThumbCard(
+                bytes:    widget.thumbnails[i],
+                filename: _shortName(widget.files[i].name),
+                onRemove: widget.enabled
+                    ? () => widget.onRemoveFile(i)
+                    : null,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _shortName(String path) {
+    final name = path.split('/').last.split('\\').last;
+    return name.length > 13 ? '${name.substring(0, 11)}…' : name;
+  }
+}
+
+// ── Thumbnail mini-card ───────────────────────────────────────────────────────
+
+class _ThumbCard extends StatelessWidget {
+  final Uint8List      bytes;
+  final String         filename;
+  final VoidCallback?  onRemove;
+  const _ThumbCard(
+      {required this.bytes, required this.filename, this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 82,
+      height: 82,
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.memory(bytes,
+                width: 82, height: 82, fit: BoxFit.cover),
+          ),
+          // Bottom gradient + filename
+          Positioned(
+            left: 0, right: 0, bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
+              decoration: BoxDecoration(
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(10)),
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.72),
+                    Colors.transparent
+                  ],
+                ),
+              ),
+              child: Text(
+                filename,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 7,
+                    fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          // Remove button
+          if (onRemove != null)
+            Positioned(
+              top: 3, right: 3,
+              child: GestureDetector(
+                onTap: onRemove,
+                child: Container(
+                  width: 18, height: 18,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withValues(alpha: 0.75),
+                    border: Border.all(
+                        color: _kPurpleL.withValues(alpha: 0.6), width: 1),
+                  ),
+                  child: const Icon(Icons.close_rounded,
+                      size: 11, color: Colors.white),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -989,11 +1177,13 @@ class _AlgoCardState extends State<_AlgoCard>
 
 class _UploadButton extends StatefulWidget {
   final bool              enabled;
+  final int               fileCount;
   final Animation<double> pulseAnim;
   final VoidCallback      onTap;
 
   const _UploadButton({
     required this.enabled,
+    required this.fileCount,
     required this.pulseAnim,
     required this.onTap,
   });
@@ -1066,7 +1256,9 @@ class _UploadButtonState extends State<_UploadButton> {
               ),
               const SizedBox(width: 10),
               Text(
-                'Encrypt & Upload',
+                widget.fileCount > 1
+                    ? 'Encrypt & Upload ${widget.fileCount} Images'
+                    : 'Encrypt & Upload',
                 style: TextStyle(
                   color: widget.enabled
                       ? _kWhite
@@ -1090,11 +1282,15 @@ class _UploadButtonState extends State<_UploadButton> {
 
 class _ProgressSteps extends StatelessWidget {
   final int               step;
+  final int               currentUpload;
+  final int               totalUploads;
   final Animation<double> pulseAnim;
   final Animation<double> checkAnim;
   const _ProgressSteps({
     super.key,
     required this.step,
+    required this.currentUpload,
+    required this.totalUploads,
     required this.pulseAnim,
     required this.checkAnim,
   });
@@ -1114,9 +1310,9 @@ class _ProgressSteps extends StatelessWidget {
         ),
       ),
       child: switch (step) {
-        1 => _EncryptingStep(key: const ValueKey(1), pulseAnim: pulseAnim),
-        2 => const _UploadingStep(key: ValueKey(2)),
-        _ => _DoneStep(key: const ValueKey(3), checkAnim: checkAnim),
+        1 => _EncryptingStep(key: ValueKey('enc_$currentUpload'), pulseAnim: pulseAnim, current: currentUpload, total: totalUploads),
+        2 => _UploadingStep(key: ValueKey('upl_$currentUpload'), current: currentUpload, total: totalUploads),
+        _ => _DoneStep(key: const ValueKey(3), checkAnim: checkAnim, total: totalUploads),
       },
     );
   }
@@ -1126,7 +1322,9 @@ class _ProgressSteps extends StatelessWidget {
 
 class _EncryptingStep extends StatelessWidget {
   final Animation<double> pulseAnim;
-  const _EncryptingStep({super.key, required this.pulseAnim});
+  final int current;
+  final int total;
+  const _EncryptingStep({super.key, required this.pulseAnim, required this.current, required this.total});
 
   @override
   Widget build(BuildContext context) {
@@ -1172,7 +1370,7 @@ class _EncryptingStep extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Applying local encryption to your image…',
+            total > 1 ? 'Encrypting image $current of $total…' : 'Applying local encryption to your image…',
             style: TextStyle(
               color: _kWhite.withValues(alpha: 0.38),
               fontSize: 11,
@@ -1187,7 +1385,9 @@ class _EncryptingStep extends StatelessWidget {
 // ── Step: Uploading ───────────────────────────────────────────────────────────
 
 class _UploadingStep extends StatelessWidget {
-  const _UploadingStep({super.key});
+  final int current;
+  final int total;
+  const _UploadingStep({super.key, required this.current, required this.total});
 
   @override
   Widget build(BuildContext context) {
@@ -1220,7 +1420,7 @@ class _UploadingStep extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Sending encrypted ciphertext to server…',
+            total > 1 ? 'Uploading image $current of $total…' : 'Sending encrypted ciphertext to server…',
             style: TextStyle(
               color: _kWhite.withValues(alpha: 0.38),
               fontSize: 11,
@@ -1245,7 +1445,8 @@ class _UploadingStep extends StatelessWidget {
 
 class _DoneStep extends StatelessWidget {
   final Animation<double> checkAnim;
-  const _DoneStep({super.key, required this.checkAnim});
+  final int total;
+  const _DoneStep({super.key, required this.checkAnim, required this.total});
 
   @override
   Widget build(BuildContext context) {
@@ -1291,7 +1492,7 @@ class _DoneStep extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Image encrypted and stored securely.',
+            total > 1 ? '$total images encrypted and stored securely.' : 'Image encrypted and stored securely.',
             style: TextStyle(
               color: _kWhite.withValues(alpha: 0.38),
               fontSize: 11,

@@ -34,6 +34,10 @@ class _GalleryScreenState extends State<GalleryScreen>
   late final AnimationController _scanCtrl;
   late final Animation<double>   _pulseAnim;
 
+  // ── Selection mode ─────────────────────────────────────────────────────────
+  bool       _selectionMode = false;
+  final Set<int> _selectedIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -69,6 +73,113 @@ class _GalleryScreenState extends State<GalleryScreen>
     if (mounted) Navigator.pushReplacementNamed(context, '/login');
   }
 
+  // ── Selection helpers ──────────────────────────────────────────────────────
+  void _enterSelection(int mediaId) {
+    setState(() {
+      _selectionMode = true;
+      _selectedIds.add(mediaId);
+    });
+  }
+
+  void _toggleSelect(int mediaId) {
+    setState(() {
+      if (_selectedIds.contains(mediaId)) {
+        _selectedIds.remove(mediaId);
+        if (_selectedIds.isEmpty) _selectionMode = false;
+      } else {
+        _selectedIds.add(mediaId);
+      }
+    });
+  }
+
+  void _cancelSelection() {
+    setState(() {
+      _selectionMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  void _shareSelected(GalleryProvider provider) {
+    final items = provider.mediaList
+        .where((m) => _selectedIds.contains(m.mediaId))
+        .toList();
+    if (items.isEmpty) return;
+    _cancelSelection();
+    Navigator.pushNamed(context, '/share', arguments: items);
+  }
+
+  Future<void> _deleteSelected(GalleryProvider provider) async {
+    final toDelete = provider.mediaList
+        .where((m) => _selectedIds.contains(m.mediaId))
+        .toList();
+    if (toDelete.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF0F0730),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: _kPurple.withValues(alpha: 0.3)),
+          ),
+          title: Row(children: [
+            const Icon(Icons.warning_amber_rounded,
+                color: Color(0xFFFC8181), size: 22),
+            const SizedBox(width: 10),
+            Text('Delete ${toDelete.length} File${toDelete.length == 1 ? '' : 's'}',
+                style: const TextStyle(color: _kWhite, fontSize: 16)),
+          ]),
+          content: Text(
+            'Permanently delete ${toDelete.length} encrypted file${toDelete.length == 1 ? '' : 's'}? Their keys will also be destroyed.',
+            style: TextStyle(
+                color: _kWhite.withValues(alpha: 0.6),
+                fontSize: 13,
+                height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Cancel',
+                  style: TextStyle(
+                      color: _kWhite.withValues(alpha: 0.5))),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Destroy All',
+                  style: TextStyle(
+                      color: Color(0xFFFC8181),
+                      fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    _cancelSelection();
+    int deleted = 0;
+    for (final item in toDelete) {
+      try {
+        await MediaService.deleteMedia(item.mediaId);
+        await StorageService.deleteSymmetricKey(item.mediaId);
+        if (mounted) provider.removeMedia(item.mediaId);
+        deleted++;
+      } catch (_) {}
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+            '$deleted file${deleted == 1 ? '' : 's'} destroyed from vault.'),
+        backgroundColor: _kPurple2,
+        behavior: SnackBarBehavior.floating,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<GalleryProvider>();
@@ -86,36 +197,50 @@ class _GalleryScreenState extends State<GalleryScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _GlassHeader(
-                  count: count,
-                  pulseAnim: _pulseAnim,
-                  onInbox:  () => Navigator.pushNamed(context, '/inbox'),
-                  onLogout: _logout,
-                ),
+                // Header OR selection action bar
+                if (_selectionMode)
+                  _SelectionBar(
+                    count:    _selectedIds.length,
+                    onShare:  () => _shareSelected(provider),
+                    onDelete: () => _deleteSelected(provider),
+                    onCancel: _cancelSelection,
+                  )
+                else
+                  _GlassHeader(
+                    count:    count,
+                    pulseAnim: _pulseAnim,
+                    onInbox:  () => Navigator.pushNamed(context, '/inbox'),
+                    onLogout: _logout,
+                  ),
                 _StatsBar(count: count),
                 Expanded(
                   child: _GridArea(
-                    provider:  provider,
-                    scanCtrl:  _scanCtrl,
-                    pulseAnim: _pulseAnim,
+                    provider:       provider,
+                    scanCtrl:       _scanCtrl,
+                    pulseAnim:      _pulseAnim,
+                    selectionMode:  _selectionMode,
+                    selectedIds:    _selectedIds,
+                    onEnterSelect:  _enterSelection,
+                    onToggleSelect: _toggleSelect,
                   ),
                 ),
               ],
             ),
           ),
 
-          // ── FAB ───────────────────────────────────────────────────────────
-          Positioned(
-            right: 20, bottom: 28,
-            child: _NeonFab(
-              pulseAnim: _pulseAnim,
-              onPressed: () async {
-                final gallery = context.read<GalleryProvider>();
-                await Navigator.pushNamed(context, '/upload');
-                if (mounted) gallery.loadMedia();
-              },
+          // ── FAB (hidden in selection mode) ────────────────────────────────
+          if (!_selectionMode)
+            Positioned(
+              right: 20, bottom: 28,
+              child: _NeonFab(
+                pulseAnim: _pulseAnim,
+                onPressed: () async {
+                  final gallery = context.read<GalleryProvider>();
+                  await Navigator.pushNamed(context, '/upload');
+                  if (mounted) gallery.loadMedia();
+                },
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -257,6 +382,78 @@ class _HeaderIcon extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+//  Selection action bar
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _SelectionBar extends StatelessWidget {
+  final int          count;
+  final VoidCallback onShare;
+  final VoidCallback onDelete;
+  final VoidCallback onCancel;
+
+  const _SelectionBar({
+    required this.count,
+    required this.onShare,
+    required this.onDelete,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+          decoration: BoxDecoration(
+            color: _kPurple.withValues(alpha: 0.14),
+            border: Border(
+              bottom: BorderSide(
+                  color: _kPurple.withValues(alpha: 0.4), width: 1),
+            ),
+          ),
+          child: Row(
+            children: [
+              // Cancel
+              _HeaderIcon(
+                  icon: Icons.close_rounded,
+                  tooltip: 'Cancel',
+                  onTap: onCancel),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$count selected',
+                  style: const TextStyle(
+                    color: _kPurpleL,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              // Delete
+              _HeaderIcon(
+                icon: Icons.delete_outline_rounded,
+                tooltip: 'Delete selected',
+                onTap: onDelete,
+                color: const Color(0xFFFC8181),
+              ),
+              // Share
+              _HeaderIcon(
+                icon: Icons.share_outlined,
+                tooltip: 'Safe Share selected',
+                onTap: onShare,
+                color: _kGreen,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 //  Stats bar
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -367,14 +564,22 @@ class _StatChip extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _GridArea extends StatelessWidget {
-  final GalleryProvider provider;
+  final GalleryProvider    provider;
   final AnimationController scanCtrl;
-  final Animation<double> pulseAnim;
+  final Animation<double>  pulseAnim;
+  final bool               selectionMode;
+  final Set<int>           selectedIds;
+  final void Function(int) onEnterSelect;
+  final void Function(int) onToggleSelect;
 
   const _GridArea({
     required this.provider,
     required this.scanCtrl,
     required this.pulseAnim,
+    required this.selectionMode,
+    required this.selectedIds,
+    required this.onEnterSelect,
+    required this.onToggleSelect,
   });
 
   @override
@@ -452,10 +657,17 @@ class _GridArea extends StatelessWidget {
                   childAspectRatio: 1.0,
                 ),
                 itemCount: provider.mediaList.length,
-                itemBuilder: (context, i) => _MediaTile(
-                  item: provider.mediaList[i],
-                  index: i,
-                ),
+                itemBuilder: (context, i) {
+                  final item = provider.mediaList[i];
+                  return _MediaTile(
+                    item:             item,
+                    index:            i,
+                    isSelectionMode:  selectionMode,
+                    isSelected:       selectedIds.contains(item.mediaId),
+                    onLongPressSelect: () => onEnterSelect(item.mediaId),
+                    onToggleSelect:   () => onToggleSelect(item.mediaId),
+                  );
+                },
               ),
             );
           },
@@ -542,9 +754,21 @@ class _EmptyVault extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _MediaTile extends StatefulWidget {
-  final MediaItem item;
-  final int index;
-  const _MediaTile({required this.item, required this.index});
+  final MediaItem    item;
+  final int          index;
+  final bool         isSelectionMode;
+  final bool         isSelected;
+  final VoidCallback onLongPressSelect;
+  final VoidCallback onToggleSelect;
+
+  const _MediaTile({
+    required this.item,
+    required this.index,
+    required this.isSelectionMode,
+    required this.isSelected,
+    required this.onLongPressSelect,
+    required this.onToggleSelect,
+  });
 
   @override
   State<_MediaTile> createState() => _MediaTileState();
@@ -585,6 +809,10 @@ class _MediaTileState extends State<_MediaTile>
   }
 
   Future<void> _onTap() async {
+    if (widget.isSelectionMode) {
+      widget.onToggleSelect();
+      return;
+    }
     if (_unlocking) return;
     setState(() => _unlocking = true);
     await _unlockCtrl.forward();
@@ -614,7 +842,9 @@ class _MediaTileState extends State<_MediaTile>
           scale: _scaleAnim.value * (1.0 + _hoverCtrl.value * 0.025),
           child: GestureDetector(
             onTap: _onTap,
-            onLongPress: () => _showOptions(context),
+            onLongPress: widget.isSelectionMode
+                ? widget.onToggleSelect
+                : widget.onLongPressSelect,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: BackdropFilter(
@@ -623,21 +853,27 @@ class _MediaTileState extends State<_MediaTile>
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     color: _kPurple.withValues(
-                        alpha: 0.07 + _hoverCtrl.value * 0.06),
+                        alpha: widget.isSelected
+                            ? 0.22
+                            : 0.07 + _hoverCtrl.value * 0.06),
                     border: Border.all(
-                      color: _kPurple.withValues(
-                          alpha: 0.15 +
-                              _hoverCtrl.value * 0.2 +
-                              _glowAnim.value * 0.5),
-                      width: 1.2,
+                      color: widget.isSelected
+                          ? _kPurpleL.withValues(alpha: 0.9)
+                          : _kPurple.withValues(
+                              alpha: 0.15 +
+                                  _hoverCtrl.value * 0.2 +
+                                  _glowAnim.value * 0.5),
+                      width: widget.isSelected ? 2.0 : 1.2,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: _kPurple.withValues(
-                            alpha: _hoverCtrl.value * 0.28 +
-                                _glowAnim.value * 0.45),
-                        blurRadius: 20,
-                        spreadRadius: -2 + _hoverCtrl.value * 4,
+                        color: widget.isSelected
+                            ? _kPurpleL.withValues(alpha: 0.4)
+                            : _kPurple.withValues(
+                                alpha: _hoverCtrl.value * 0.28 +
+                                    _glowAnim.value * 0.45),
+                        blurRadius: widget.isSelected ? 18 : 20,
+                        spreadRadius: widget.isSelected ? 1 : -2 + _hoverCtrl.value * 4,
                       ),
                     ],
                   ),
@@ -691,8 +927,7 @@ class _MediaTileState extends State<_MediaTile>
                                     borderRadius: BorderRadius.circular(5),
                                     color: _algoColor.withValues(alpha: 0.12),
                                     border: Border.all(
-                                        color:
-                                            _algoColor.withValues(alpha: 0.4),
+                                        color: _algoColor.withValues(alpha: 0.4),
                                         width: 0.8),
                                   ),
                                   child: Text(
@@ -706,9 +941,17 @@ class _MediaTileState extends State<_MediaTile>
                                   ),
                                 ),
                                 const Spacer(),
-                                Icon(Icons.more_horiz_rounded,
-                                    size: 14,
-                                    color: _kWhite.withValues(alpha: 0.3)),
+                                // ··· menu — always opens options sheet
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () => _showOptions(context),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(2),
+                                    child: Icon(Icons.more_horiz_rounded,
+                                        size: 14,
+                                        color: _kWhite.withValues(alpha: 0.4)),
+                                  ),
+                                ),
                               ],
                             ),
                           ],
@@ -731,6 +974,28 @@ class _MediaTileState extends State<_MediaTile>
                                 ],
                               ),
                             ),
+                          ),
+                        ),
+
+                      // ── Selection checkmark overlay ─────────────────
+                      if (widget.isSelected)
+                        Positioned(
+                          top: 6, right: 6,
+                          child: Container(
+                            width: 22, height: 22,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _kPurple,
+                              border: Border.all(
+                                  color: Colors.white, width: 1.5),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: _kPurpleL.withValues(alpha: 0.6),
+                                    blurRadius: 8),
+                              ],
+                            ),
+                            child: const Icon(Icons.check_rounded,
+                                size: 13, color: Colors.white),
                           ),
                         ),
                     ],
@@ -898,7 +1163,7 @@ class _OptionsSheet extends StatelessWidget {
                   color: _kGreen,
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.pushNamed(context, '/share', arguments: item);
+                    Navigator.pushNamed(context, '/share', arguments: [item]);
                   },
                 ),
                 _SheetAction(
