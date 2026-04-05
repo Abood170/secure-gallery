@@ -1,23 +1,24 @@
-# ── Node.js backend ───────────────────────────────────────────────────────────
-app/node_modules/
+# Environment variables — NEVER commit these
 app/.env
+.env
+
+# Node
+app/node_modules/
 app/uploads/
 
-# ── Flutter frontend ──────────────────────────────────────────────────────────
+# Flutter build artifacts
+gallery_app/build/
 gallery_app/.dart_tool/
 gallery_app/.flutter-plugins-dependencies
-gallery_app/.pub-cache/
-gallery_app/.pub/
-gallery_app/build/
-gallery_app/coverage/
+gallery_app/*.iml
+gallery_app/android/*.iml
+gallery_app/android/local.properties
 
-# ── OS / Editor ───────────────────────────────────────────────────────────────
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
 .DS_Store
 Thumbs.db
-.idea/
-*.iml
-.vscode/
-
-# ── Sensitive / generated ─────────────────────────────────────────────────────
-*.log
-*.env

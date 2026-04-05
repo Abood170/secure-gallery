@@ -64,28 +64,69 @@
       };
     }
 
-    async function nativeRsaEncrypt(publicKeyPem, dataB64) {
-      const pemBody = publicKeyPem
+    // Converts a PKCS#1 RSAPublicKey DER buffer → SPKI DER buffer so that
+    // SubtleCrypto.importKey('spki', ...) can accept it.
+    function _pkcs1ToSpki(pkcs1) {
+      function encLen(n) {
+        if (n < 128) return [n];
+        const b = [];
+        let t = n;
+        while (t > 0) { b.unshift(t & 0xff); t >>= 8; }
+        return [0x80 | b.length, ...b];
+      }
+      // AlgorithmIdentifier: SEQUENCE { OID rsaEncryption, NULL }
+      const algId = new Uint8Array([
+        0x30, 0x0d,
+        0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01,
+        0x05, 0x00
+      ]);
+      // BIT STRING wrapping the PKCS#1 bytes (0x00 = no unused bits)
+      const bitStr = new Uint8Array([0x03, ...encLen(pkcs1.length + 1), 0x00, ...pkcs1]);
+      const inner  = new Uint8Array([...algId, ...bitStr]);
+      return new Uint8Array([0x30, ...encLen(inner.length), ...inner]);
+    }
+
+    // Strips PEM headers/footers and decodes Base64, handling both SPKI and PKCS#1.
+    function _pemToSpkiBuf(pem) {
+      if (pem.includes('BEGIN RSA PUBLIC KEY')) {
+        // PKCS#1 → wrap into SPKI so SubtleCrypto accepts it
+        const b64 = pem
+          .replace(/-----BEGIN RSA PUBLIC KEY-----/, '')
+          .replace(/-----END RSA PUBLIC KEY-----/, '')
+          .replace(/\s+/g, '');
+        const pkcs1 = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        return _pkcs1ToSpki(pkcs1);
+      }
+      // Already SPKI (BEGIN PUBLIC KEY)
+      const b64 = pem
         .replace(/-----BEGIN PUBLIC KEY-----/, '')
         .replace(/-----END PUBLIC KEY-----/, '')
         .replace(/\s+/g, '');
-      const keyBuf = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0));
+      return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    }
+
+    async function nativeRsaEncrypt(publicKeyPem, dataB64) {
+      console.log('[RSA] Encrypting, key format:', publicKeyPem.includes('RSA PUBLIC KEY') ? 'PKCS1' : 'SPKI');
+      const keyBuf    = _pemToSpkiBuf(publicKeyPem);
       const cryptoKey = await window.crypto.subtle.importKey(
         'spki', keyBuf, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']
       );
-      const dataBuf  = Uint8Array.from(atob(dataB64), c => c.charCodeAt(0));
+      const dataBuf   = new TextEncoder().encode(dataB64);
       const encrypted = await window.crypto.subtle.encrypt(
         { name: 'RSA-OAEP' }, cryptoKey, dataBuf
       );
-      return btoa(String.fromCharCode.apply(null, new Uint8Array(encrypted)));
+      const result = btoa(String.fromCharCode.apply(null, new Uint8Array(encrypted)));
+      console.log('[RSA] Encrypt OK, ciphertext length:', result.length);
+      return result;
     }
 
     async function nativeRsaDecrypt(privateKeyPem, dataB64) {
+      console.log('[RSA] Decrypting, key format:', privateKeyPem.includes('RSA PRIVATE KEY') ? 'PKCS1(unsupported)' : 'PKCS8');
       const pemBody = privateKeyPem
         .replace(/-----BEGIN PRIVATE KEY-----/, '')
         .replace(/-----END PRIVATE KEY-----/, '')
         .replace(/\s+/g, '');
-      const keyBuf = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0));
+      const keyBuf    = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0));
       const cryptoKey = await window.crypto.subtle.importKey(
         'pkcs8', keyBuf, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['decrypt']
       );
@@ -93,7 +134,9 @@
       const decrypted = await window.crypto.subtle.decrypt(
         { name: 'RSA-OAEP' }, cryptoKey, dataBuf
       );
-      return btoa(String.fromCharCode.apply(null, new Uint8Array(decrypted)));
+      const result = new TextDecoder().decode(decrypted);
+      console.log('[RSA] Decrypt OK, key starts with:', result.substring(0, 8));
+      return result;
     }
   </script>
 </body>

@@ -12,6 +12,7 @@ import 'screens/upload_screen.dart';
 import 'screens/view_image_screen.dart';
 import 'screens/share_screen.dart';
 import 'screens/inbox_screen.dart';
+import 'screens/profile_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +48,7 @@ class SecureGalleryApp extends StatelessWidget {
           '/view':     (_) => const ViewImageScreen(),
           '/share':    (_) => const ShareScreen(),
           '/inbox':    (_) => const InboxScreen(),
+          '/profile':  (_) => const ProfileScreen(),
           '/admin':    (_) => const AdminDashboardScreen(),
         },
       ),

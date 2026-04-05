@@ -1,23 +1,16 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:js_interop';
 import 'package:cryptography/cryptography.dart';
-import 'package:fast_rsa/fast_rsa.dart' as rsa;
-import 'package:flutter/foundation.dart' show kIsWeb;
 
-@JS('nativeGenerateRsaKeyPair')
-external JSPromise _nativeGenerateRsaKeyPair();
-
-@JS('nativeRsaEncrypt')
-external JSPromise _nativeRsaEncrypt(String publicKeyPem, String dataB64);
-
-@JS('nativeRsaDecrypt')
-external JSPromise _nativeRsaDecrypt(String privateKeyPem, String dataB64);
-
-extension type _RsaKeyPair(JSObject _) implements JSObject {
-  external String get privateKey;
-  external String get publicKey;
-}
+// Conditional import: the Dart compiler picks exactly ONE of these at build
+// time.  No runtime switch, no dart:js_interop on native, no fast_rsa on web.
+//
+//   dart.library.js_interop → web / wasm  → crypto_rsa_web.dart
+//   dart.library.io          → Android / iOS / desktop → crypto_rsa_mobile.dart
+//   (fallback)               → crypto_rsa_stub.dart   (throws at runtime)
+import 'crypto_rsa_stub.dart'
+    if (dart.library.js_interop) 'crypto_rsa_web.dart'
+    if (dart.library.io) 'crypto_rsa_mobile.dart';
 
 /// Result returned by any symmetric encrypt call.
 class EncryptResult {
@@ -35,43 +28,28 @@ class EncryptResult {
 class CryptoService {
   // ── RSA Key Pair ─────────────────────────────────────────────────────────────
 
-  static Future<Map<String, String>> generateRsaKeyPair() async {
-    if (kIsWeb) {
-      // Use browser's native SubtleCrypto — generates RSA-2048 in milliseconds.
-      final result = (await _nativeGenerateRsaKeyPair().toDart) as _RsaKeyPair;
-      return {
-        'privateKey': result.privateKey,
-        'publicKey':  result.publicKey,
-      };
-    }
-    // Native (Android/iOS): fast_rsa uses hardware-accelerated RSA.
-    final pair = await rsa.RSA.generate(2048);
-    return {'privateKey': pair.privateKey, 'publicKey': pair.publicKey};
-  }
+  /// Generates a 2048-bit RSA-OAEP key pair.
+  /// Web: delegates to browser SubtleCrypto (fast, hardware-backed).
+  /// Android/iOS: delegates to fast_rsa (Rust FFI, also hardware-backed).
+  static Future<Map<String, String>> generateRsaKeyPair() =>
+      platformRsaGenerateKeyPair();
 
   // ── RSA-OAEP Key Wrapping ────────────────────────────────────────────────────
 
-  /// Encrypt a Base64 symmetric key with recipient's RSA public key (PEM).
+  /// Wraps a Base64 symmetric key with the recipient's RSA public key (PEM).
   /// Returns Base64-encoded RSA ciphertext.
   static Future<String> rsaEncryptKey(
-      String keyBase64, String publicKeyPem) async {
-    if (kIsWeb) {
-      final result = (await _nativeRsaEncrypt(publicKeyPem, keyBase64).toDart) as JSString;
-      return result.toDart;
-    }
-    return rsa.RSA.encryptOAEP(keyBase64, '', rsa.Hash.SHA256, publicKeyPem);
-  }
+          String keyBase64, String publicKeyPem) =>
+      platformRsaEncrypt(publicKeyPem, keyBase64);
 
+  /// Unwraps a Base64 RSA ciphertext with the user's RSA private key (PEM).
+  /// Returns the original Base64 symmetric key.
   static Future<String> rsaDecryptKey(
-      String encryptedKeyBase64, String privateKeyPem) async {
-    if (kIsWeb) {
-      final result = (await _nativeRsaDecrypt(privateKeyPem, encryptedKeyBase64).toDart) as JSString;
-      return result.toDart;
-    }
-    return rsa.RSA.decryptOAEP(encryptedKeyBase64, '', rsa.Hash.SHA256, privateKeyPem);
-  }
+          String encryptedKeyBase64, String privateKeyPem) =>
+      platformRsaDecrypt(privateKeyPem, encryptedKeyBase64);
 
   // ── AES-256-GCM ──────────────────────────────────────────────────────────────
+  // Uses the `cryptography` pure-Dart package — identical on web and mobile.
 
   static Future<EncryptResult> encryptAesGcm(Uint8List plaintext) async {
     final algorithm = AesGcm.with256bits();
@@ -85,7 +63,7 @@ class CryptoService {
     );
 
     final keyBytes = await secretKey.extractBytes();
-    // Store cipherText + 16-byte MAC together in the uploaded file
+    // Append 16-byte MAC to cipherText so a single blob is stored/transferred.
     final combined = Uint8List.fromList(
         secretBox.cipherText + secretBox.mac.bytes);
 
@@ -102,10 +80,10 @@ class CryptoService {
     required String keyBase64,
   }) async {
     final algorithm = AesGcm.with256bits();
-    final nonce    = base64.decode(ivBase64);
-    final keyBytes = base64.decode(keyBase64);
+    final nonce     = base64.decode(ivBase64);
+    final keyBytes  = base64.decode(keyBase64);
 
-    // Last 16 bytes = MAC tag; the rest = cipher text
+    // Last 16 bytes = MAC tag; the rest = cipher text.
     final mac        = Mac(ciphertextWithMac.sublist(ciphertextWithMac.length - 16));
     final cipherText = ciphertextWithMac.sublist(0, ciphertextWithMac.length - 16);
 
@@ -145,8 +123,8 @@ class CryptoService {
     required String keyBase64,
   }) async {
     final algorithm = Chacha20.poly1305Aead();
-    final nonce    = base64.decode(ivBase64);
-    final keyBytes = base64.decode(keyBase64);
+    final nonce     = base64.decode(ivBase64);
+    final keyBytes  = base64.decode(keyBase64);
 
     final mac        = Mac(ciphertextWithMac.sublist(ciphertextWithMac.length - 16));
     final cipherText = ciphertextWithMac.sublist(0, ciphertextWithMac.length - 16);

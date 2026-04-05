@@ -209,6 +209,7 @@ class _GalleryScreenState extends State<GalleryScreen>
                   _GlassHeader(
                     count:    count,
                     pulseAnim: _pulseAnim,
+                    onProfile: () => Navigator.pushNamed(context, '/profile'),
                     onInbox:  () => Navigator.pushNamed(context, '/inbox'),
                     onLogout: _logout,
                   ),
@@ -254,12 +255,14 @@ class _GalleryScreenState extends State<GalleryScreen>
 class _GlassHeader extends StatelessWidget {
   final int count;
   final Animation<double> pulseAnim;
+  final VoidCallback onProfile;
   final VoidCallback onInbox;
   final VoidCallback onLogout;
 
   const _GlassHeader({
     required this.count,
     required this.pulseAnim,
+    required this.onProfile,
     required this.onInbox,
     required this.onLogout,
   });
@@ -327,6 +330,12 @@ class _GlassHeader extends StatelessWidget {
                 ),
               ),
 
+              // Profile
+              _HeaderIcon(
+                icon: Icons.account_circle_outlined,
+                tooltip: 'Profile',
+                onTap: onProfile,
+              ),
               // Inbox
               _HeaderIcon(
                 icon: Icons.move_to_inbox_outlined,

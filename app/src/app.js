@@ -7,11 +7,12 @@ const rateLimit    = require('express-rate-limit');
 const { sequelize } = require('./models');
 const errorHandler = require('./middleware/errorHandler');
 
-const authRoutes  = require('./routes/auth');
-const mediaRoutes = require('./routes/media');
-const shareRoutes = require('./routes/share');
-const userRoutes  = require('./routes/user');
-const adminRoutes = require('./routes/admin');
+const authRoutes    = require('./routes/auth');
+const mediaRoutes   = require('./routes/media');
+const shareRoutes   = require('./routes/share');
+const userRoutes    = require('./routes/user');
+const adminRoutes   = require('./routes/admin');
+const profileRoutes = require('./routes/profile');
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -31,11 +32,12 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-app.use('/api/auth',  authRoutes);
-app.use('/api/media', mediaRoutes);
-app.use('/api/share', shareRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/auth',    authRoutes);
+app.use('/api/media',   mediaRoutes);
+app.use('/api/share',   shareRoutes);
+app.use('/api/users',   userRoutes);
+app.use('/api/admin',   adminRoutes);
+app.use('/api/profile', profileRoutes);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use((_req, res) => res.status(404).json({ error: 'Route not found.' }));

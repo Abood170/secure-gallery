@@ -20,6 +20,8 @@ class ApiConfig {
   static String downloadShared(int id) => '/api/share/$id/download';
   static String deleteShare(int id)    => '/api/share/$id';
 
+  static const String profile = '/api/profile';
+
   static const String adminStats     = '/api/admin/stats';
   static const String adminUsers     = '/api/admin/users';
   static const String adminMedia     = '/api/admin/media';

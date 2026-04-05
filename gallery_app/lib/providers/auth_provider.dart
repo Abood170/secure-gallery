@@ -5,6 +5,8 @@ import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/crypto_service.dart';
 
+// ignore_for_file: avoid_print
+
 class AuthProvider extends ChangeNotifier {
   bool _isLoggedIn = false;
   bool _loading    = false;
@@ -36,21 +38,30 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       // Generate a fresh key pair for every new registration
+      print('[AUTH] Generating RSA key pair...');
       final kp = await CryptoService.generateRsaKeyPair();
+      print('[AUTH] Key pair generated. Public key starts with: ${kp['publicKey']?.substring(0, 40)}');
 
+      print('[AUTH] Posting to ${ApiConfig.baseUrl}${ApiConfig.register}');
       final res = await ApiService.dio.post(ApiConfig.register, data: {
         'email':      email,
         'password':   password,
         'public_key': kp['publicKey'],
       });
 
+      print('[AUTH] Register response ${res.statusCode}: ${res.data}');
       final userId = res.data['user_id'] as int;
       await StorageService.saveUserId(userId);
       await StorageService.saveKeyPair(userId, kp['privateKey']!, kp['publicKey']!);
 
       return true;
     } on DioException catch (e) {
-      _error = (e.response?.data as Map?)?['error'] ?? 'Registration failed.';
+      print('[AUTH] DioException: ${e.type} | status: ${e.response?.statusCode} | data: ${e.response?.data} | message: ${e.message}');
+      _error = (e.response?.data as Map?)?['error'] ?? 'Registration failed. (${e.type.name})';
+      return false;
+    } catch (e, st) {
+      print('[AUTH] Unexpected error: $e\n$st');
+      _error = 'Error: $e';
       return false;
     } finally {
       _loading = false;

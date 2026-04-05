@@ -8,7 +8,9 @@ plugins {
 android {
     namespace = "com.secgallery.gallery_app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // fast_rsa ships pre-built Rust .so files that require NDK ≥ 23.
+    // Pin to a known-good version so the build is deterministic.
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
