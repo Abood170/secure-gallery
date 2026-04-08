@@ -374,6 +374,28 @@ audit_logs  → log_id, user_id, action, ip, timestamp
 
 ---
 
+## 📸 Screenshots (Web)
+
+### Login
+![Login](screenshots/web/login.png)
+
+### Register
+![Register](screenshots/web/register.png)
+
+### Gallery
+![Gallery](screenshots/web/gallery.png)
+
+### Safe Share
+![Safe Share](screenshots/web/safe-share.png)
+
+### Inbox
+![Inbox](screenshots/web/inbox.png)
+
+### Profile
+![Profile](screenshots/web/profile.png)
+
+---
+
 ## 🔒 Security Notes
 
 - Server stores **only ciphertext** — cannot decrypt any image
