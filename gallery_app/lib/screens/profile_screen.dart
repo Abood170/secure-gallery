@@ -12,14 +12,14 @@ import '../services/profile_service.dart';
 import '../services/storage_service.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-const _kBg      = Color(0xFF060918);
-const _kPurple  = Color(0xFF7C3AED);
+const _kBg = Color(0xFF060918);
+const _kPurple = Color(0xFF7C3AED);
 const _kPurpleL = Color(0xFFA78BFA);
 const _kPurple2 = Color(0xFF4C1D95);
-const _kGreen   = Color(0xFF10B981);
-const _kAmber   = Color(0xFFF59E0B);
-const _kRed     = Color(0xFFFC8181);
-const _kWhite   = Colors.white;
+const _kGreen = Color(0xFF10B981);
+const _kAmber = Color(0xFFF59E0B);
+const _kRed = Color(0xFFFC8181);
+const _kWhite = Colors.white;
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  ProfileScreen
@@ -34,28 +34,27 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen>
     with TickerProviderStateMixin {
-
   // ── Data ──────────────────────────────────────────────────────────────────
   UserProfile? _profile;
-  bool   _loading   = true;
+  bool _loading = true;
   String? _loadError;
 
   // ── Edit email ────────────────────────────────────────────────────────────
-  final _newEmailCtrl    = TextEditingController();
-  final _emailPassCtrl   = TextEditingController();
-  final _emailFormKey    = GlobalKey<FormState>();
-  bool  _emailSaving     = false;
-  bool  _emailObscure    = true;
+  final _newEmailCtrl = TextEditingController();
+  final _emailPassCtrl = TextEditingController();
+  final _emailFormKey = GlobalKey<FormState>();
+  bool _emailSaving = false;
+  bool _emailObscure = true;
 
   // ── Change password ───────────────────────────────────────────────────────
-  final _curPassCtrl  = TextEditingController();
-  final _newPassCtrl  = TextEditingController();
-  final _cfmPassCtrl  = TextEditingController();
-  final _passFormKey  = GlobalKey<FormState>();
-  bool  _passSaving   = false;
-  bool  _curObscure   = true;
-  bool  _newObscure   = true;
-  bool  _cfmObscure   = true;
+  final _curPassCtrl = TextEditingController();
+  final _newPassCtrl = TextEditingController();
+  final _cfmPassCtrl = TextEditingController();
+  final _passFormKey = GlobalKey<FormState>();
+  bool _passSaving = false;
+  bool _curObscure = true;
+  bool _newObscure = true;
+  bool _cfmObscure = true;
 
   // ── Key regen ─────────────────────────────────────────────────────────────
   bool _regenLoading = false;
@@ -65,9 +64,9 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   // ── Animations ────────────────────────────────────────────────────────────
   late final AnimationController _fadeCtrl;
-  late final Animation<double>   _fadeAnim;
+  late final Animation<double> _fadeAnim;
   late final AnimationController _pulseCtrl;
-  late final Animation<double>   _pulseAnim;
+  late final Animation<double> _pulseAnim;
 
   @override
   void initState() {
@@ -76,11 +75,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         vsync: this, duration: const Duration(milliseconds: 600));
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
 
-    _pulseCtrl = AnimationController(
-        vsync: this, duration: const Duration(seconds: 2))
-      ..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.4, end: 1.0).animate(
-        CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+    _pulseCtrl =
+        AnimationController(vsync: this, duration: const Duration(seconds: 2))
+          ..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 0.4, end: 1.0)
+        .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
 
     _loadProfile();
   }
@@ -100,16 +99,27 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   // ── Load ──────────────────────────────────────────────────────────────────
   Future<void> _loadProfile() async {
-    setState(() { _loading = true; _loadError = null; });
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final p = await ProfileService.getProfile();
       if (mounted) {
-        setState(() { _profile = p; _loading = false; });
+        setState(() {
+          _profile = p;
+          _loading = false;
+        });
         _newEmailCtrl.text = p.email;
         _fadeCtrl.forward(from: 0);
       }
     } catch (e) {
-      if (mounted) setState(() { _loading = false; _loadError = _msg(e); });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = _msg(e);
+        });
+      }
     }
   }
 
@@ -119,7 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     setState(() => _emailSaving = true);
     try {
       await ProfileService.updateProfile(
-        newEmail:        _newEmailCtrl.text.trim(),
+        newEmail: _newEmailCtrl.text.trim(),
         currentPassword: _emailPassCtrl.text,
       );
       _emailPassCtrl.clear();
@@ -138,7 +148,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     setState(() => _passSaving = true);
     try {
       await ProfileService.updateProfile(
-        newPassword:     _newPassCtrl.text,
+        newPassword: _newPassCtrl.text,
         currentPassword: _curPassCtrl.text,
       );
       _curPassCtrl.clear();
@@ -155,22 +165,26 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ── Regenerate RSA keys ───────────────────────────────────────────────────
   Future<void> _regenerateKeys() async {
     final confirmed = await _showConfirmDialog(
-      title:   'Regenerate Encryption Keys',
-      message: 'This will generate a new RSA key pair and upload the new public key.\n\n'
-               'Previously received shares will no longer be decryptable on this device.\n\n'
-               'Are you sure?',
+      title: 'Regenerate Encryption Keys',
+      message:
+          'This will generate a new RSA key pair and upload the new public key.\n\n'
+          'Previously received shares will no longer be decryptable on this device.\n\n'
+          'Are you sure?',
       confirm: 'Regenerate',
-      danger:  false,
+      danger: false,
     );
     if (confirmed != true) return;
 
     setState(() => _regenLoading = true);
     try {
-      final kp     = await CryptoService.generateRsaKeyPair();
+      final kp = await CryptoService.generateRsaKeyPair();
       final userId = await StorageService.getUserId();
-      if (userId == null) throw Exception('Session expired. Please log in again.');
+      if (userId == null) {
+        throw Exception('Session expired. Please log in again.');
+      }
 
-      await StorageService.saveKeyPair(userId, kp['privateKey']!, kp['publicKey']!);
+      await StorageService.saveKeyPair(
+          userId, kp['privateKey']!, kp['publicKey']!);
       await ApiService.dio.put(
         ApiConfig.updatePublicKey,
         data: {'public_key': kp['publicKey']},
@@ -213,7 +227,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ── Helpers ───────────────────────────────────────────────────────────────
   String _msg(Object e) {
     if (e is DioException) {
-      return (e.response?.data as Map?)?['error']?.toString() ?? e.message ?? 'Request failed.';
+      return (e.response?.data as Map?)?['error']?.toString() ??
+          e.message ??
+          'Request failed.';
     }
     return e.toString();
   }
@@ -231,7 +247,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     required String title,
     required String message,
     required String confirm,
-    required bool   danger,
+    required bool danger,
   }) =>
       showDialog<bool>(
         context: context,
@@ -254,15 +270,14 @@ class _ProfileScreenState extends State<ProfileScreen>
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: Text('Cancel',
-                    style:
-                        TextStyle(color: _kWhite.withValues(alpha: 0.5))),
+                    style: TextStyle(color: _kWhite.withValues(alpha: 0.5))),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
                 child: Text(confirm,
                     style: TextStyle(
-                        color:       danger ? _kRed : _kPurpleL,
-                        fontWeight:  FontWeight.w700)),
+                        color: danger ? _kRed : _kPurpleL,
+                        fontWeight: FontWeight.w700)),
               ),
             ],
           ),
@@ -282,10 +297,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                   borderRadius: BorderRadius.circular(20),
                   side: BorderSide(color: _kRed.withValues(alpha: 0.35)),
                 ),
-                title: Row(children: [
+                title: const Row(children: [
                   Icon(Icons.warning_amber_rounded, color: _kRed, size: 20),
-                  const SizedBox(width: 8),
-                  const Text('Delete Account',
+                  SizedBox(width: 8),
+                  Text('Delete Account',
                       style: TextStyle(color: _kRed, fontSize: 16)),
                 ]),
                 content: Column(
@@ -302,8 +317,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     const SizedBox(height: 16),
                     _GlassField(
                       controller: _delPassCtrl,
-                      label:      'Enter your password',
-                      obscure:    obscure,
+                      label: 'Enter your password',
+                      obscure: obscure,
                       prefixIcon: Icons.lock_outline_rounded,
                       onToggleObscure: () => setSt(() => obscure = !obscure),
                     ),
@@ -313,8 +328,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
                     child: Text('Cancel',
-                        style: TextStyle(
-                            color: _kWhite.withValues(alpha: 0.5))),
+                        style:
+                            TextStyle(color: _kWhite.withValues(alpha: 0.5))),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
@@ -356,13 +371,16 @@ class _ProfileScreenState extends State<ProfileScreen>
         child: AnimatedBuilder(
           animation: _pulseAnim,
           builder: (_, __) => Container(
-            width: 60, height: 60,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              boxShadow: [BoxShadow(
-                color: _kPurple.withValues(alpha: _pulseAnim.value * 0.5),
-                blurRadius: 24,
-              )],
+              boxShadow: [
+                BoxShadow(
+                  color: _kPurple.withValues(alpha: _pulseAnim.value * 0.5),
+                  blurRadius: 24,
+                )
+              ],
             ),
             child: const CircularProgressIndicator(
                 color: _kPurpleL, strokeWidth: 2),
@@ -419,16 +437,17 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                 // Edit email
                 _SectionCard(
-                  icon:  Icons.alternate_email_rounded,
+                  icon: Icons.alternate_email_rounded,
                   title: 'EMAIL ADDRESS',
                   child: _EmailSection(
-                    emailCtrl:   _newEmailCtrl,
-                    passCtrl:    _emailPassCtrl,
-                    formKey:     _emailFormKey,
-                    saving:      _emailSaving,
-                    obscure:     _emailObscure,
-                    onToggle:    () => setState(() => _emailObscure = !_emailObscure),
-                    onSave:      _saveEmail,
+                    emailCtrl: _newEmailCtrl,
+                    passCtrl: _emailPassCtrl,
+                    formKey: _emailFormKey,
+                    saving: _emailSaving,
+                    obscure: _emailObscure,
+                    onToggle: () =>
+                        setState(() => _emailObscure = !_emailObscure),
+                    onSave: _saveEmail,
                     currentEmail: p.email,
                   ),
                 ),
@@ -436,33 +455,33 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                 // Change password
                 _SectionCard(
-                  icon:  Icons.lock_reset_rounded,
+                  icon: Icons.lock_reset_rounded,
                   title: 'CHANGE PASSWORD',
                   child: _PasswordSection(
-                    curCtrl:   _curPassCtrl,
-                    newCtrl:   _newPassCtrl,
-                    cfmCtrl:   _cfmPassCtrl,
-                    formKey:   _passFormKey,
-                    saving:    _passSaving,
-                    curObs:    _curObscure,
-                    newObs:    _newObscure,
-                    cfmObs:    _cfmObscure,
-                    onCurTog:  () => setState(() => _curObscure = !_curObscure),
-                    onNewTog:  () => setState(() => _newObscure = !_newObscure),
-                    onCfmTog:  () => setState(() => _cfmObscure = !_cfmObscure),
-                    onSave:    _changePassword,
+                    curCtrl: _curPassCtrl,
+                    newCtrl: _newPassCtrl,
+                    cfmCtrl: _cfmPassCtrl,
+                    formKey: _passFormKey,
+                    saving: _passSaving,
+                    curObs: _curObscure,
+                    newObs: _newObscure,
+                    cfmObs: _cfmObscure,
+                    onCurTog: () => setState(() => _curObscure = !_curObscure),
+                    onNewTog: () => setState(() => _newObscure = !_newObscure),
+                    onCfmTog: () => setState(() => _cfmObscure = !_cfmObscure),
+                    onSave: _changePassword,
                   ),
                 ),
                 const SizedBox(height: 14),
 
                 // Security / RSA keys
                 _SectionCard(
-                  icon:  Icons.vpn_key_rounded,
+                  icon: Icons.vpn_key_rounded,
                   title: 'ENCRYPTION KEYS',
                   child: _SecuritySection(
-                    hasPublicKey:  p.hasPublicKey,
-                    regenLoading:  _regenLoading,
-                    onRegen:       _regenerateKeys,
+                    hasPublicKey: p.hasPublicKey,
+                    regenLoading: _regenLoading,
+                    onRegen: _regenerateKeys,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -501,9 +520,13 @@ class _ProfileBackground extends StatelessWidget {
           ),
         ),
       ),
-      Positioned(top: -80, left: -60,
+      Positioned(
+          top: -80,
+          left: -60,
           child: _GlowOrb(size: 300, color: _kPurple2.withValues(alpha: 0.25))),
-      Positioned(bottom: -60, right: -40,
+      Positioned(
+          bottom: -60,
+          right: -40,
           child: _GlowOrb(size: 240, color: _kPurple.withValues(alpha: 0.15))),
       Positioned.fill(child: CustomPaint(painter: _GridPainter())),
     ]);
@@ -512,28 +535,34 @@ class _ProfileBackground extends StatelessWidget {
 
 class _GlowOrb extends StatelessWidget {
   final double size;
-  final Color  color;
+  final Color color;
   const _GlowOrb({required this.size, required this.color});
   @override
   Widget build(BuildContext context) => Container(
-    width: size, height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: RadialGradient(colors: [color, Colors.transparent]),
-    ),
-  );
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [color, Colors.transparent]),
+        ),
+      );
 }
 
 class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = const Color(0x09A78BFA)..strokeWidth = 0.5;
+    final p = Paint()
+      ..color = const Color(0x09A78BFA)
+      ..strokeWidth = 0.5;
     const step = 44.0;
-    for (double x = 0; x < size.width;  x += step)
+    for (double x = 0; x < size.width; x += step) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
-    for (double y = 0; y < size.height; y += step)
+    }
+    for (double y = 0; y < size.height; y += step) {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
+    }
   }
+
   @override
   bool shouldRepaint(_GridPainter _) => false;
 }
@@ -586,20 +615,16 @@ class _ProfileHeader extends StatelessWidget {
                           letterSpacing: 1.5)),
                   Text('Manage your account and security',
                       style: TextStyle(
-                          color: _kPurpleL,
-                          fontSize: 10,
-                          letterSpacing: 0.8)),
+                          color: _kPurpleL, fontSize: 10, letterSpacing: 0.8)),
                 ],
               ),
             ),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
                 color: _kPurple.withValues(alpha: 0.15),
-                border:
-                    Border.all(color: _kPurple.withValues(alpha: 0.35)),
+                border: Border.all(color: _kPurple.withValues(alpha: 0.35)),
               ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
@@ -627,7 +652,7 @@ class _ProfileHeader extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _HeroCard extends StatelessWidget {
-  final UserProfile       profile;
+  final UserProfile profile;
   final Animation<double> pulseAnim;
   const _HeroCard({required this.profile, required this.pulseAnim});
 
@@ -636,7 +661,9 @@ class _HeroCard extends StatelessWidget {
     if (parts.length >= 2) {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
-    return profile.email.substring(0, math.min(2, profile.email.length)).toUpperCase();
+    return profile.email
+        .substring(0, math.min(2, profile.email.length))
+        .toUpperCase();
   }
 
   @override
@@ -650,25 +677,28 @@ class _HeroCard extends StatelessWidget {
           builder: (_, child) => Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              boxShadow: [BoxShadow(
-                color: _kPurple.withValues(alpha: pulseAnim.value * 0.55),
-                blurRadius: 20,
-                spreadRadius: 2,
-              )],
+              boxShadow: [
+                BoxShadow(
+                  color: _kPurple.withValues(alpha: pulseAnim.value * 0.55),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                )
+              ],
             ),
             child: child,
           ),
           child: Container(
-            width: 64, height: 64,
+            width: 64,
+            height: 64,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
                 colors: [_kPurple, _kPurple2],
                 begin: Alignment.topLeft,
-                end:   Alignment.bottomRight,
+                end: Alignment.bottomRight,
               ),
-              border: Border.all(
-                  color: _kPurpleL.withValues(alpha: 0.4), width: 2),
+              border:
+                  Border.all(color: _kPurpleL.withValues(alpha: 0.4), width: 2),
             ),
             child: Center(
               child: Text(_initials,
@@ -699,12 +729,14 @@ class _HeroCard extends StatelessWidget {
                 _Chip(
                   label: isAdmin ? 'ADMIN' : 'USER',
                   color: isAdmin ? _kAmber : _kPurpleL,
-                  icon:  isAdmin ? Icons.admin_panel_settings_rounded : Icons.person_rounded,
+                  icon: isAdmin
+                      ? Icons.admin_panel_settings_rounded
+                      : Icons.person_rounded,
                 ),
-                _Chip(
+                const _Chip(
                   label: 'E2E PROTECTED',
                   color: _kGreen,
-                  icon:  Icons.verified_user_outlined,
+                  icon: Icons.verified_user_outlined,
                 ),
               ]),
             ],
@@ -722,28 +754,32 @@ class _HeroCard extends StatelessWidget {
 class _BannedBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(14),
-      color: _kRed.withValues(alpha: 0.08),
-      border: Border.all(color: _kRed.withValues(alpha: 0.4)),
-    ),
-    child: Row(children: [
-      Icon(Icons.block_rounded, color: _kRed, size: 18),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Account Suspended',
-              style: TextStyle(
-                  color: _kRed, fontSize: 13, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 2),
-          Text('Your account has been suspended. Contact support for assistance.',
-              style: TextStyle(
-                  color: _kRed.withValues(alpha: 0.7), fontSize: 11, height: 1.4)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: _kRed.withValues(alpha: 0.08),
+          border: Border.all(color: _kRed.withValues(alpha: 0.4)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.block_rounded, color: _kRed, size: 18),
+          const SizedBox(width: 12),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Account Suspended',
+                  style: TextStyle(
+                      color: _kRed, fontSize: 13, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Text(
+                  'Your account has been suspended. Contact support for assistance.',
+                  style: TextStyle(
+                      color: _kRed.withValues(alpha: 0.7),
+                      fontSize: 11,
+                      height: 1.4)),
+            ]),
+          ),
         ]),
-      ),
-    ]),
-  );
+      );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -765,28 +801,31 @@ class _StatsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionLabel(icon: Icons.bar_chart_rounded, title: 'ACTIVITY'),
+          const _SectionLabel(icon: Icons.bar_chart_rounded, title: 'ACTIVITY'),
           const SizedBox(height: 14),
           Row(children: [
-            Expanded(child: _StatTile(
-              icon:    Icons.lock_rounded,
-              color:   _kPurpleL,
-              value:   '${profile.mediaCount}',
-              label:   'Uploaded',
+            Expanded(
+                child: _StatTile(
+              icon: Icons.lock_rounded,
+              color: _kPurpleL,
+              value: '${profile.mediaCount}',
+              label: 'Uploaded',
             )),
             _VertDiv(),
-            Expanded(child: _StatTile(
-              icon:    Icons.share_outlined,
-              color:   _kGreen,
-              value:   '${profile.sharesSent}',
-              label:   'Shared',
+            Expanded(
+                child: _StatTile(
+              icon: Icons.share_outlined,
+              color: _kGreen,
+              value: '${profile.sharesSent}',
+              label: 'Shared',
             )),
             _VertDiv(),
-            Expanded(child: _StatTile(
-              icon:    Icons.move_to_inbox_outlined,
-              color:   _kAmber,
-              value:   '${profile.sharesReceived}',
-              label:   'Received',
+            Expanded(
+                child: _StatTile(
+              icon: Icons.move_to_inbox_outlined,
+              color: _kAmber,
+              value: '${profile.sharesReceived}',
+              label: 'Received',
             )),
           ]),
           const SizedBox(height: 14),
@@ -818,14 +857,14 @@ class _StatsCard extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _EmailSection extends StatelessWidget {
-  final TextEditingController  emailCtrl;
-  final TextEditingController  passCtrl;
-  final GlobalKey<FormState>   formKey;
-  final bool                   saving;
-  final bool                   obscure;
-  final VoidCallback           onToggle;
-  final VoidCallback           onSave;
-  final String                 currentEmail;
+  final TextEditingController emailCtrl;
+  final TextEditingController passCtrl;
+  final GlobalKey<FormState> formKey;
+  final bool saving;
+  final bool obscure;
+  final VoidCallback onToggle;
+  final VoidCallback onSave;
+  final String currentEmail;
 
   const _EmailSection({
     required this.emailCtrl,
@@ -845,7 +884,7 @@ class _EmailSection extends StatelessWidget {
       child: Column(children: [
         _GlassField(
           controller: emailCtrl,
-          label:      'New email address',
+          label: 'New email address',
           prefixIcon: Icons.alternate_email_rounded,
           keyboardType: TextInputType.emailAddress,
           validator: (v) {
@@ -859,19 +898,19 @@ class _EmailSection extends StatelessWidget {
         const SizedBox(height: 12),
         _GlassField(
           controller: passCtrl,
-          label:      'Current password to confirm',
+          label: 'Current password to confirm',
           prefixIcon: Icons.lock_outline_rounded,
-          obscure:    obscure,
+          obscure: obscure,
           onToggleObscure: onToggle,
           validator: (v) =>
               (v == null || v.isEmpty) ? 'Password required' : null,
         ),
         const SizedBox(height: 18),
         _ActionButton(
-          label:   'Save Email',
-          icon:    Icons.save_rounded,
+          label: 'Save Email',
+          icon: Icons.save_rounded,
           loading: saving,
-          onTap:   onSave,
+          onTap: onSave,
         ),
       ]),
     );
@@ -884,15 +923,22 @@ class _EmailSection extends StatelessWidget {
 
 class _PasswordSection extends StatelessWidget {
   final TextEditingController curCtrl, newCtrl, cfmCtrl;
-  final GlobalKey<FormState>  formKey;
+  final GlobalKey<FormState> formKey;
   final bool saving, curObs, newObs, cfmObs;
   final VoidCallback onCurTog, onNewTog, onCfmTog, onSave;
 
   const _PasswordSection({
-    required this.curCtrl, required this.newCtrl, required this.cfmCtrl,
-    required this.formKey, required this.saving,
-    required this.curObs,  required this.newObs,  required this.cfmObs,
-    required this.onCurTog, required this.onNewTog, required this.onCfmTog,
+    required this.curCtrl,
+    required this.newCtrl,
+    required this.cfmCtrl,
+    required this.formKey,
+    required this.saving,
+    required this.curObs,
+    required this.newObs,
+    required this.cfmObs,
+    required this.onCurTog,
+    required this.onNewTog,
+    required this.onCfmTog,
     required this.onSave,
   });
 
@@ -903,35 +949,36 @@ class _PasswordSection extends StatelessWidget {
       child: Column(children: [
         _GlassField(
           controller: curCtrl,
-          label:      'Current password',
+          label: 'Current password',
           prefixIcon: Icons.lock_outline_rounded,
-          obscure:    curObs,
+          obscure: curObs,
           onToggleObscure: onCurTog,
           validator: (v) =>
               (v == null || v.isEmpty) ? 'Enter current password' : null,
         ),
         const SizedBox(height: 12),
         // New password with live strength indicator
-        _PasswordWithStrength(controller: newCtrl, obscure: newObs, onToggle: onNewTog),
+        _PasswordWithStrength(
+            controller: newCtrl, obscure: newObs, onToggle: onNewTog),
         const SizedBox(height: 12),
         _GlassField(
           controller: cfmCtrl,
-          label:      'Confirm new password',
+          label: 'Confirm new password',
           prefixIcon: Icons.lock_rounded,
-          obscure:    cfmObs,
+          obscure: cfmObs,
           onToggleObscure: onCfmTog,
           validator: (v) {
             if (v == null || v.isEmpty) return 'Confirm your password';
-            if (v != newCtrl.text)      return 'Passwords do not match';
+            if (v != newCtrl.text) return 'Passwords do not match';
             return null;
           },
         ),
         const SizedBox(height: 18),
         _ActionButton(
-          label:   'Update Password',
-          icon:    Icons.lock_reset_rounded,
+          label: 'Update Password',
+          icon: Icons.lock_reset_rounded,
           loading: saving,
-          onTap:   onSave,
+          onTap: onSave,
         ),
       ]),
     );
@@ -944,8 +991,8 @@ class _PasswordSection extends StatelessWidget {
 
 class _PasswordWithStrength extends StatefulWidget {
   final TextEditingController controller;
-  final bool                  obscure;
-  final VoidCallback          onToggle;
+  final bool obscure;
+  final VoidCallback onToggle;
   const _PasswordWithStrength({
     required this.controller,
     required this.obscure,
@@ -961,26 +1008,26 @@ class _PasswordWithStrengthState extends State<_PasswordWithStrength> {
 
   int get _strength {
     int s = 0;
-    if (_pass.length >= 8)                      s++;
-    if (RegExp(r'[A-Z]').hasMatch(_pass))       s++;
-    if (RegExp(r'[0-9]').hasMatch(_pass))       s++;
+    if (_pass.length >= 8) s++;
+    if (RegExp(r'[A-Z]').hasMatch(_pass)) s++;
+    if (RegExp(r'[0-9]').hasMatch(_pass)) s++;
     if (RegExp(r'[!@#\$%^&*]').hasMatch(_pass)) s++;
     return s;
   }
 
   Color get _strengthColor => switch (_strength) {
-    0 || 1 => _kRed,
-    2      => _kAmber,
-    3      => const Color(0xFF60A5FA),
-    _      => _kGreen,
-  };
+        0 || 1 => _kRed,
+        2 => _kAmber,
+        3 => const Color(0xFF60A5FA),
+        _ => _kGreen,
+      };
 
   String get _strengthLabel => switch (_strength) {
-    0 || 1 => 'Weak',
-    2      => 'Fair',
-    3      => 'Good',
-    _      => 'Strong',
-  };
+        0 || 1 => 'Weak',
+        2 => 'Fair',
+        3 => 'Good',
+        _ => 'Strong',
+      };
 
   @override
   void initState() {
@@ -997,9 +1044,9 @@ class _PasswordWithStrengthState extends State<_PasswordWithStrength> {
       children: [
         _GlassField(
           controller: widget.controller,
-          label:      'New password',
+          label: 'New password',
           prefixIcon: Icons.lock_rounded,
-          obscure:    widget.obscure,
+          obscure: widget.obscure,
           onToggleObscure: widget.onToggle,
           validator: (v) {
             if (v == null || v.length < 8) return 'Minimum 8 characters';
@@ -1026,9 +1073,12 @@ class _PasswordWithStrengthState extends State<_PasswordWithStrength> {
                             ? _strengthColor
                             : _kPurple.withValues(alpha: 0.2),
                         boxShadow: filled
-                            ? [BoxShadow(
-                                color: _strengthColor.withValues(alpha: 0.5),
-                                blurRadius: 4)]
+                            ? [
+                                BoxShadow(
+                                    color:
+                                        _strengthColor.withValues(alpha: 0.5),
+                                    blurRadius: 4)
+                              ]
                             : [],
                       ),
                     ),
@@ -1045,10 +1095,10 @@ class _PasswordWithStrengthState extends State<_PasswordWithStrength> {
           ]),
           const SizedBox(height: 6),
           Wrap(spacing: 6, runSpacing: 4, children: [
-            _HintChip('8+ chars',    _pass.length >= 8),
-            _HintChip('UPPERCASE',   RegExp(r'[A-Z]').hasMatch(_pass)),
-            _HintChip('Number',      RegExp(r'[0-9]').hasMatch(_pass)),
-            _HintChip('Symbol',      RegExp(r'[!@#\$%^&*]').hasMatch(_pass)),
+            _HintChip('8+ chars', _pass.length >= 8),
+            _HintChip('UPPERCASE', RegExp(r'[A-Z]').hasMatch(_pass)),
+            _HintChip('Number', RegExp(r'[0-9]').hasMatch(_pass)),
+            _HintChip('Symbol', RegExp(r'[!@#\$%^&*]').hasMatch(_pass)),
           ]),
         ],
       ],
@@ -1058,7 +1108,7 @@ class _PasswordWithStrengthState extends State<_PasswordWithStrength> {
 
 class _HintChip extends StatelessWidget {
   final String label;
-  final bool   met;
+  final bool met;
   const _HintChip(this.label, this.met);
 
   @override
@@ -1089,8 +1139,8 @@ class _HintChip extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _SecuritySection extends StatelessWidget {
-  final bool         hasPublicKey;
-  final bool         regenLoading;
+  final bool hasPublicKey;
+  final bool regenLoading;
   final VoidCallback onRegen;
 
   const _SecuritySection({
@@ -1106,17 +1156,17 @@ class _SecuritySection extends StatelessWidget {
       children: [
         // Key status rows
         _KeyStatusRow(
-          label:  'Public Key',
-          sub:    hasPublicKey ? 'Stored on server' : 'Not found on server',
-          ok:     hasPublicKey,
-          icon:   Icons.cloud_done_outlined,
+          label: 'Public Key',
+          sub: hasPublicKey ? 'Stored on server' : 'Not found on server',
+          ok: hasPublicKey,
+          icon: Icons.cloud_done_outlined,
         ),
         const SizedBox(height: 10),
-        _KeyStatusRow(
+        const _KeyStatusRow(
           label: 'Private Key',
-          sub:   'Stored locally on this device',
-          ok:    true,
-          icon:  Icons.phone_android_rounded,
+          sub: 'Stored locally on this device',
+          ok: true,
+          icon: Icons.phone_android_rounded,
         ),
         const SizedBox(height: 18),
 
@@ -1131,8 +1181,7 @@ class _SecuritySection extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline_rounded,
-                  color: _kAmber, size: 14),
+              const Icon(Icons.info_outline_rounded, color: _kAmber, size: 14),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1149,11 +1198,11 @@ class _SecuritySection extends StatelessWidget {
         const SizedBox(height: 14),
 
         _ActionButton(
-          label:   'Regenerate Key Pair',
-          icon:    Icons.refresh_rounded,
+          label: 'Regenerate Key Pair',
+          icon: Icons.refresh_rounded,
           loading: regenLoading,
-          color:   _kAmber,
-          onTap:   onRegen,
+          color: _kAmber,
+          onTap: onRegen,
         ),
       ],
     );
@@ -1161,8 +1210,8 @@ class _SecuritySection extends StatelessWidget {
 }
 
 class _KeyStatusRow extends StatelessWidget {
-  final String  label, sub;
-  final bool    ok;
+  final String label, sub;
+  final bool ok;
   final IconData icon;
   const _KeyStatusRow({
     required this.label,
@@ -1184,14 +1233,13 @@ class _KeyStatusRow extends StatelessWidget {
       child: Row(children: [
         Icon(icon, color: color.withValues(alpha: 0.8), size: 18),
         const SizedBox(width: 12),
-        Expanded(child: Column(
+        Expanded(
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label,
                 style: const TextStyle(
-                    color: _kWhite,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
+                    color: _kWhite, fontSize: 13, fontWeight: FontWeight.w600)),
             const SizedBox(height: 2),
             Text(sub,
                 style: TextStyle(
@@ -1248,19 +1296,19 @@ class _DangerZone extends StatelessWidget {
                   color: _kRed.withValues(alpha: 0.7)),
               const SizedBox(height: 16),
               _ActionButton(
-                label:    'Logout',
-                icon:     Icons.logout_rounded,
-                color:    _kPurpleL,
+                label: 'Logout',
+                icon: Icons.logout_rounded,
+                color: _kPurpleL,
                 outlined: true,
-                onTap:    onLogout,
+                onTap: onLogout,
               ),
               const SizedBox(height: 10),
               _ActionButton(
-                label:    'Delete Account',
-                icon:     Icons.delete_forever_rounded,
-                color:    _kRed,
+                label: 'Delete Account',
+                icon: Icons.delete_forever_rounded,
+                color: _kRed,
                 outlined: true,
-                onTap:    onDelete,
+                onTap: onDelete,
               ),
             ],
           ),
@@ -1290,11 +1338,13 @@ class _GlassPanel extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             color: _kWhite.withValues(alpha: 0.03),
             border: Border.all(color: _kPurple.withValues(alpha: 0.2)),
-            boxShadow: [BoxShadow(
-              color: _kPurple.withValues(alpha: 0.08),
-              blurRadius: 40,
-              spreadRadius: -4,
-            )],
+            boxShadow: [
+              BoxShadow(
+                color: _kPurple.withValues(alpha: 0.08),
+                blurRadius: 40,
+                spreadRadius: -4,
+              )
+            ],
           ),
           padding: const EdgeInsets.all(22),
           child: child,
@@ -1307,8 +1357,8 @@ class _GlassPanel extends StatelessWidget {
 /// Glass panel with a header label built in
 class _SectionCard extends StatelessWidget {
   final IconData icon;
-  final String   title;
-  final Widget   child;
+  final String title;
+  final Widget child;
   const _SectionCard({
     required this.icon,
     required this.title,
@@ -1333,8 +1383,8 @@ class _SectionCard extends StatelessWidget {
 /// Small label used at the top of each section
 class _SectionLabel extends StatelessWidget {
   final IconData icon;
-  final String   title;
-  final Color?   color;
+  final String title;
+  final Color? color;
   const _SectionLabel({
     required this.icon,
     required this.title,
@@ -1360,18 +1410,18 @@ class _SectionLabel extends StatelessWidget {
 /// Glass-style text field matching the share_screen pattern
 class _GlassField extends StatefulWidget {
   final TextEditingController controller;
-  final String                label;
-  final IconData              prefixIcon;
-  final bool                  obscure;
-  final TextInputType?        keyboardType;
-  final VoidCallback?         onToggleObscure;
+  final String label;
+  final IconData prefixIcon;
+  final bool obscure;
+  final TextInputType? keyboardType;
+  final VoidCallback? onToggleObscure;
   final String? Function(String?)? validator;
 
   const _GlassField({
     required this.controller,
     required this.label,
     required this.prefixIcon,
-    this.obscure         = false,
+    this.obscure = false,
     this.keyboardType,
     this.onToggleObscure,
     this.validator,
@@ -1384,7 +1434,7 @@ class _GlassField extends StatefulWidget {
 class _GlassFieldState extends State<_GlassField>
     with SingleTickerProviderStateMixin {
   late final AnimationController _focusCtrl;
-  late final Animation<double>   _focusAnim;
+  late final Animation<double> _focusAnim;
   final _focusNode = FocusNode();
 
   @override
@@ -1392,8 +1442,7 @@ class _GlassFieldState extends State<_GlassField>
     super.initState();
     _focusCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 250));
-    _focusAnim =
-        CurvedAnimation(parent: _focusCtrl, curve: Curves.easeOut);
+    _focusAnim = CurvedAnimation(parent: _focusCtrl, curve: Curves.easeOut);
     _focusNode.addListener(() {
       _focusNode.hasFocus ? _focusCtrl.forward() : _focusCtrl.reverse();
     });
@@ -1414,31 +1463,31 @@ class _GlassFieldState extends State<_GlassField>
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-              color: _kPurple.withValues(
-                  alpha: 0.18 + _focusAnim.value * 0.52),
+              color: _kPurple.withValues(alpha: 0.18 + _focusAnim.value * 0.52),
               width: 1 + _focusAnim.value * 0.5),
-          color: _kPurple.withValues(
-              alpha: 0.05 + _focusAnim.value * 0.05),
-          boxShadow: [BoxShadow(
-            color: _kPurple.withValues(alpha: _focusAnim.value * 0.20),
-            blurRadius: 14,
-            spreadRadius: -2,
-          )],
+          color: _kPurple.withValues(alpha: 0.05 + _focusAnim.value * 0.05),
+          boxShadow: [
+            BoxShadow(
+              color: _kPurple.withValues(alpha: _focusAnim.value * 0.20),
+              blurRadius: 14,
+              spreadRadius: -2,
+            )
+          ],
         ),
         child: child,
       ),
       child: TextFormField(
-        controller:   widget.controller,
-        focusNode:    _focusNode,
-        obscureText:  widget.obscure,
+        controller: widget.controller,
+        focusNode: _focusNode,
+        obscureText: widget.obscure,
         keyboardType: widget.keyboardType,
-        style:        const TextStyle(color: _kWhite, fontSize: 14),
-        cursorColor:  _kPurpleL,
-        validator:    widget.validator,
+        style: const TextStyle(color: _kWhite, fontSize: 14),
+        cursorColor: _kPurpleL,
+        validator: widget.validator,
         decoration: InputDecoration(
-          hintText:  widget.label,
-          hintStyle: TextStyle(
-              color: _kWhite.withValues(alpha: 0.25), fontSize: 13),
+          hintText: widget.label,
+          hintStyle:
+              TextStyle(color: _kWhite.withValues(alpha: 0.25), fontSize: 13),
           prefixIcon: Padding(
             padding: const EdgeInsets.only(left: 14, right: 10),
             child: Icon(widget.prefixIcon,
@@ -1457,11 +1506,10 @@ class _GlassFieldState extends State<_GlassField>
                   onPressed: widget.onToggleObscure,
                 )
               : null,
-          border:           InputBorder.none,
-          contentPadding:   const EdgeInsets.symmetric(
-              horizontal: 16, vertical: 15),
-          errorStyle: const TextStyle(
-              color: _kRed, fontSize: 10),
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          errorStyle: const TextStyle(color: _kRed, fontSize: 10),
         ),
       ),
     );
@@ -1470,20 +1518,20 @@ class _GlassFieldState extends State<_GlassField>
 
 /// Gradient purple action button
 class _ActionButton extends StatefulWidget {
-  final String    label;
-  final IconData  icon;
-  final bool      loading;
-  final bool      outlined;
-  final Color     color;
+  final String label;
+  final IconData icon;
+  final bool loading;
+  final bool outlined;
+  final Color color;
   final VoidCallback onTap;
 
   const _ActionButton({
     required this.label,
     required this.icon,
     required this.onTap,
-    this.loading  = false,
+    this.loading = false,
     this.outlined = false,
-    this.color    = _kPurple,
+    this.color = _kPurple,
   });
 
   @override
@@ -1499,7 +1547,7 @@ class _ActionButtonState extends State<_ActionButton> {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
-      onExit:  (_) => setState(() => _hovered = false),
+      onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         onTap: widget.loading ? null : widget.onTap,
         child: AnimatedContainer(
@@ -1518,35 +1566,35 @@ class _ActionButtonState extends State<_ActionButton> {
             color: isOutlined ? Colors.transparent : null,
             border: isOutlined
                 ? Border.all(
-                    color: widget.color.withValues(
-                        alpha: _hovered ? 0.8 : 0.45),
+                    color:
+                        widget.color.withValues(alpha: _hovered ? 0.8 : 0.45),
                     width: 1.2)
                 : null,
             boxShadow: isOutlined
                 ? []
-                : [BoxShadow(
-                    color: widget.color.withValues(
-                        alpha: _hovered ? 0.45 : 0.22),
-                    blurRadius: _hovered ? 24 : 14,
-                    offset: const Offset(0, 3),
-                    spreadRadius: -2,
-                  )],
+                : [
+                    BoxShadow(
+                      color: widget.color
+                          .withValues(alpha: _hovered ? 0.45 : 0.22),
+                      blurRadius: _hovered ? 24 : 14,
+                      offset: const Offset(0, 3),
+                      spreadRadius: -2,
+                    )
+                  ],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (widget.loading)
                 SizedBox(
-                  width: 16, height: 16,
+                  width: 16,
+                  height: 16,
                   child: CircularProgressIndicator(
                       color: widget.color, strokeWidth: 2),
                 )
               else
                 Icon(widget.icon,
-                    size: 16,
-                    color: isOutlined
-                        ? widget.color
-                        : _kWhite),
+                    size: 16, color: isOutlined ? widget.color : _kWhite),
               const SizedBox(width: 9),
               Text(
                 widget.label,
@@ -1566,8 +1614,8 @@ class _ActionButtonState extends State<_ActionButton> {
 
 /// Small colored chip / badge
 class _Chip extends StatelessWidget {
-  final String   label;
-  final Color    color;
+  final String label;
+  final Color color;
   final IconData icon;
   const _Chip({required this.label, required this.color, required this.icon});
 
@@ -1596,9 +1644,9 @@ class _Chip extends StatelessWidget {
 
 class _StatTile extends StatelessWidget {
   final IconData icon;
-  final Color    color;
-  final String   value;
-  final String   label;
+  final Color color;
+  final String value;
+  final String label;
   const _StatTile({
     required this.icon,
     required this.color,
@@ -1627,27 +1675,28 @@ class _StatTile extends StatelessWidget {
 class _VertDiv extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-    width: 1, height: 44,
-    color: _kPurple.withValues(alpha: 0.2),
-  );
+        width: 1,
+        height: 44,
+        color: _kPurple.withValues(alpha: 0.2),
+      );
 }
 
 class _GlowLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-    height: 1,
-    decoration: BoxDecoration(
-      gradient: LinearGradient(colors: [
-        Colors.transparent,
-        _kPurple.withValues(alpha: 0.35),
-        Colors.transparent,
-      ]),
-    ),
-  );
+        height: 1,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [
+            Colors.transparent,
+            _kPurple.withValues(alpha: 0.35),
+            Colors.transparent,
+          ]),
+        ),
+      );
 }
 
 class _NeonTextButton extends StatelessWidget {
-  final String   label;
+  final String label;
   final VoidCallback onTap;
   const _NeonTextButton({required this.label, required this.onTap});
 
